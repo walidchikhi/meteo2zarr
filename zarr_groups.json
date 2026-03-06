@@ -1,11 +1,12 @@
 {
-    "description": "Configuration des groupes Zarr pour AROME/ALADIN",
+    "description": "Configuration des groupes Zarr pour AROME/ALADIN/ARPEGE",
     "groups": {
         "surface": {
-            "description": "Paramètres de surface (Niveau 0, 2m, 10m)",
+            "description": "Paramètres de surface (Niveau 0, 2m, 10m, MeanSea)",
             "match": {
                 "level_types": [
-                    "surface"
+                    "surface",
+                    "height"
                 ],
                 "exclude": [
                     "RR3h",
@@ -15,16 +16,8 @@
                 ]
             }
         },
-        "alt_geo": {
-            "description": "Niveaux de hauteur (Hxxx)",
-            "match": {
-                "level_types": [
-                    "height"
-                ]
-            }
-        },
-        "alt_pression": {
-            "description": "Niveaux de pression (Pxxxxx)",
+        "alt_pressure": {
+            "description": "Niveaux de pression (isobaric)",
             "match": {
                 "level_types": [
                     "isobaric"
@@ -32,18 +25,10 @@
             }
         },
         "alt_pv": {
-            "description": "Niveaux de PV (Vxxx)",
+            "description": "Niveaux de PV (potentialVorticity)",
             "match": {
                 "level_types": [
                     "pv"
-                ]
-            }
-        },
-        "model_levels": {
-            "description": "Niveaux modèle (Sxxx)",
-            "match": {
-                "level_types": [
-                    "model_level"
                 ]
             }
         },

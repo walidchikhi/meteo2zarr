@@ -1,25 +1,44 @@
 {
-    "description": "Definition table for GRIB1/GRIB2 fields mapping to Zarr/NetCDF standard variables",
+    "description": "Definition table for GRIB1/GRIB2 fields mapping to Zarr. Shortnames match fa_definitions.json for consistency.",
+    "skip_shortnames": [
+        "absv",
+        "pv",
+        "papt"
+    ],
     "fields": {
         "t": {
             "shortname": "t",
             "unit": "Celsius",
             "formula": "k2c",
-            "desc": "Temperature"
+            "desc": "Temperature",
+            "grib1_param": "11",
+            "grib2_key": "0.0.0"
         },
         "q": {
             "shortname": "q",
             "unit": "kg kg-1",
             "formula": "None",
-            "desc": "Specific Humidity"
+            "desc": "Specific Humidity",
+            "grib1_param": "51",
+            "grib2_key": "0.1.0"
         },
         "r": {
             "shortname": "r",
             "unit": "%",
             "formula": "None",
-            "desc": "Relative Humidity"
+            "desc": "Relative Humidity",
+            "grib1_param": "52",
+            "grib2_key": "0.1.1"
         },
         "gh": {
+            "shortname": "gh",
+            "unit": "m",
+            "formula": "div98",
+            "desc": "Geopotential Height",
+            "grib1_param": "6",
+            "grib2_key": "0.3.4"
+        },
+        "z": {
             "shortname": "gh",
             "unit": "m",
             "formula": "div98",
@@ -29,94 +48,248 @@
             "shortname": "u",
             "unit": "m s-1",
             "formula": "None",
-            "desc": "U-wind component"
+            "desc": "U-wind component",
+            "grib1_param": "33",
+            "grib2_key": "0.2.2"
         },
         "v": {
             "shortname": "v",
             "unit": "m s-1",
             "formula": "None",
-            "desc": "V-wind component"
+            "desc": "V-wind component",
+            "grib1_param": "34",
+            "grib2_key": "0.2.3"
         },
-        "t2m": {
-            "shortname": "2t",
-            "unit": "Celsius",
-            "formula": "k2c",
-            "desc": "2m Temperature"
-        },
-        "r2": {
-            "shortname": "2r",
-            "unit": "%",
+        "w": {
+            "shortname": "w",
+            "unit": "Pa s-1",
             "formula": "None",
-            "desc": "2m Relative Humidity"
+            "desc": "Vertical Velocity (pressure)",
+            "grib2_key": "0.2.8"
         },
-        "u10": {
+        "10u": {
             "shortname": "10u",
             "unit": "m s-1",
             "formula": "None",
-            "desc": "10m U-wind component"
+            "desc": "10m U-wind component",
+            "grib2_key": "0.2.2"
         },
-        "v10": {
+        "10v": {
             "shortname": "10v",
             "unit": "m s-1",
             "formula": "None",
-            "desc": "10m V-wind component"
+            "desc": "10m V-wind component",
+            "grib2_key": "0.2.3"
+        },
+        "2t": {
+            "shortname": "2t",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "2m Temperature",
+            "grib2_key": "0.0.0"
+        },
+        "2r": {
+            "shortname": "2r",
+            "unit": "%",
+            "formula": "None",
+            "desc": "2m Relative Humidity",
+            "grib2_key": "0.1.1"
+        },
+        "2q": {
+            "shortname": "2q",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "2m Specific Humidity"
         },
         "msl": {
             "shortname": "prmsl",
             "unit": "Pa",
             "formula": "None",
-            "desc": "MSL Pressure"
+            "desc": "MSL Pressure",
+            "grib1_param": "1",
+            "grib2_key": "0.3.0"
         },
         "sp": {
             "shortname": "ps",
             "unit": "Pa",
             "formula": "None",
-            "desc": "Surface Pressure"
+            "desc": "Surface Pressure",
+            "grib1_param": "1",
+            "grib2_key": "0.3.0"
+        },
+        "lnsp": {
+            "shortname": "lnsp",
+            "unit": "ln(Pa)",
+            "formula": "None",
+            "desc": "Log of Surface Pressure"
+        },
+        "tcc": {
+            "shortname": "totcc",
+            "unit": "%",
+            "formula": "None",
+            "desc": "Total Cloud Cover",
+            "grib2_key": "0.6.1"
         },
         "hcc": {
             "shortname": "hcc",
-            "unit": "0-1",
+            "unit": "%",
             "formula": "None",
             "desc": "High Cloud Cover"
         },
         "mcc": {
             "shortname": "mcc",
-            "unit": "0-1",
+            "unit": "%",
             "formula": "None",
             "desc": "Medium Cloud Cover"
         },
         "lcc": {
             "shortname": "lcc",
-            "unit": "0-1",
+            "unit": "%",
             "formula": "None",
             "desc": "Low Cloud Cover"
         },
-        "tcc": {
-            "shortname": "totcc",
+        "tp": {
+            "shortname": "tp",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Total Precipitation",
+            "grib1_param": "61",
+            "grib2_key": "0.1.52"
+        },
+        "sf": {
+            "shortname": "tsnowp",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Snowfall",
+            "grib2_key": "0.1.53"
+        },
+        "lsp": {
+            "shortname": "twatp_gec",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Large Scale Precipitation"
+        },
+        "cp": {
+            "shortname": "twatp_con",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Convective Precipitation"
+        },
+        "cape": {
+            "shortname": "cape",
+            "unit": "J kg-1",
+            "formula": "None",
+            "desc": "Convective Available Potential Energy",
+            "grib2_key": "0.7.6"
+        },
+        "CAPE_INS": {
+            "shortname": "cape",
+            "unit": "J kg-1",
+            "formula": "None",
+            "desc": "Instantaneous CAPE"
+        },
+        "h": {
+            "shortname": "orog",
+            "unit": "m",
+            "formula": "None",
+            "desc": "Model Surface Height / Orography",
+            "grib2_key": "0.3.6"
+        },
+        "lsm": {
+            "shortname": "lsm",
             "unit": "0-1",
             "formula": "None",
-            "desc": "Total Cloud Cover"
+            "desc": "Land-Sea Mask",
+            "grib2_key": "2.0.0"
         },
-        "tp": {
-            "shortname": "twatp",
-            "unit": "kg m-2",
+        "snom": {
+            "shortname": "snom",
+            "unit": "m",
             "formula": "None",
-            "desc": "Total Precipitation"
+            "desc": "Snow Depth"
+        },
+        "vis": {
+            "shortname": "vis",
+            "unit": "m",
+            "formula": "None",
+            "desc": "Visibility"
+        },
+        "gust": {
+            "shortname": "gust",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "Wind Gust"
+        },
+        "wg": {
+            "shortname": "gust",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "Wind Gust"
         }
     },
-    "grib1_keys": {
+    "level_type_map": {
+        "isobaricInhPa": "isobaric",
+        "heightAboveGround": "surface",
+        "surface": "surface",
+        "meanSea": "surface",
+        "entireAtmosphere": "surface",
+        "potentialVorticity": "pv",
+        "sigma": "model_level",
+        "hybrid": "model_level",
+        "nominalTop": "surface",
+        "theta": "theta"
+    },
+    "surface_height_mapping": {
+        "2": {
+            "suffix": ""
+        },
+        "10": {
+            "suffix": ""
+        }
+    },
+    "accumulations": {
+        "tp": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ]
+    },
+    "grib1_param_map": {
+        "1": "msl",
+        "6": "gh",
         "11": "t",
         "33": "u",
         "34": "v",
         "51": "q",
         "52": "r",
-        "1": "prmsl"
+        "61": "tp",
+        "65": "sf"
     },
-    "grib2_keys": {
+    "grib2_param_map": {
         "0.0.0": "t",
+        "0.0.3": "papt",
+        "0.1.0": "q",
+        "0.1.1": "r",
+        "0.1.52": "tp",
+        "0.1.53": "sf",
         "0.2.2": "u",
         "0.2.3": "v",
-        "0.1.0": "q",
-        "0.1.1": "r"
+        "0.2.8": "w",
+        "0.2.10": "absv",
+        "0.2.14": "pv",
+        "0.3.0": "sp",
+        "0.3.4": "z",
+        "0.3.6": "h",
+        "0.6.1": "tcc",
+        "0.7.6": "cape",
+        "2.0.0": "lsm",
+        "2.0.41": "snom"
     }
 }
