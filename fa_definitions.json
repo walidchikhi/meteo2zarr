@@ -29,7 +29,9 @@
         "SIM_REFLECTI",
         "POT_VORTIC",
         "THETA_VIRT",
-        "ABS_VORTIC"
+        "ABS_VORTIC",
+        "SURFIND.TERREMER",
+        "SURFEVAPOTRANSPI"
     ],
     "levels": {
         "P": {
@@ -267,6 +269,12 @@
             "formula": "None",
             "desc": "Vertical Velocity"
         },
+        "VITESSE_VE": {
+            "shortname": "w",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "Vertical Velocity"
+        },
         "ABS_VORTICIT": {
             "shortname": "vo",
             "unit": "s-1",
@@ -308,6 +316,18 @@
             "unit": "%",
             "formula": "percent",
             "desc": "2m Relative Humidity"
+        },
+        "CLSHUMI.SPECIFIQ": {
+            "shortname": "2q",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "2m Specific Humidity"
+        },
+        "SURFCAPE.POS.F00": {
+            "shortname": "cape",
+            "unit": "J kg-1",
+            "formula": "None",
+            "desc": "Convective Available Potential Energy"
         },
         "MSLPRESSURE": {
             "shortname": "prmsl",
@@ -380,6 +400,42 @@
             "unit": "kg m-2",
             "formula": "acc",
             "desc": "Large Scale Precip"
+        },
+        "SURFPREC.NEI.CON": {
+            "shortname": "tsnowp_con",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Convective Precip"
+        },
+        "SURFPREC.NEI.GEC": {
+            "shortname": "tsnowp_gec",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Large Scale Precip"
+        },
+        "AOD_DST": {
+            "shortname": "aod_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
+        },
+        "ZN_DST": {
+            "shortname": "zn_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
+        },
+        "FLX_DST": {
+            "shortname": "flx_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
+        },
+        "ZM_DST": {
+            "shortname": "zm_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
         }
     },
     "derived_fields": {
@@ -456,7 +512,7 @@
             }
         },
         "rain_aladin": {
-            "shortname": "tp",
+            "shortname": "tp_aladin",
             "unit": "kg m-2",
             "desc": "Rain Accumulation",
             "recipe": {
@@ -466,10 +522,28 @@
                     "twatp_gec"
                 ]
             }
+        },
+        "tsnowp_aladin": {
+            "shortname": "tsnowp_aladin",
+            "unit": "kg m-2",
+            "desc": "Snow Accumulation",
+            "recipe": {
+                "type": "accumulation",
+                "sources": [
+                    "tsnowp_con",
+                    "tsnowp_gec"
+                ]
+            }
         }
     },
     "accumulations": {
-        "twatp": [
+        "twatp_con": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "twatp_gec": [
             "RR3h",
             "RR6h",
             "RR12h",
@@ -481,7 +555,31 @@
             "RR12h",
             "RR24h"
         ],
+        "tp_aladin": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
         "tsnowp": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp_con": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp_gec": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp_aladin": [
             "RR3h",
             "RR6h",
             "RR12h",
