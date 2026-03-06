@@ -1,0 +1,122 @@
+{
+    "description": "Definition table for GRIB1/GRIB2 fields mapping to Zarr/NetCDF standard variables",
+    "fields": {
+        "t": {
+            "shortname": "t",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "Temperature"
+        },
+        "q": {
+            "shortname": "q",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Specific Humidity"
+        },
+        "r": {
+            "shortname": "r",
+            "unit": "%",
+            "formula": "None",
+            "desc": "Relative Humidity"
+        },
+        "gh": {
+            "shortname": "gh",
+            "unit": "m",
+            "formula": "div98",
+            "desc": "Geopotential Height"
+        },
+        "u": {
+            "shortname": "u",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "U-wind component"
+        },
+        "v": {
+            "shortname": "v",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "V-wind component"
+        },
+        "t2m": {
+            "shortname": "2t",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "2m Temperature"
+        },
+        "r2": {
+            "shortname": "2r",
+            "unit": "%",
+            "formula": "None",
+            "desc": "2m Relative Humidity"
+        },
+        "u10": {
+            "shortname": "10u",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "10m U-wind component"
+        },
+        "v10": {
+            "shortname": "10v",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "10m V-wind component"
+        },
+        "msl": {
+            "shortname": "prmsl",
+            "unit": "Pa",
+            "formula": "None",
+            "desc": "MSL Pressure"
+        },
+        "sp": {
+            "shortname": "ps",
+            "unit": "Pa",
+            "formula": "None",
+            "desc": "Surface Pressure"
+        },
+        "hcc": {
+            "shortname": "hcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "High Cloud Cover"
+        },
+        "mcc": {
+            "shortname": "mcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "Medium Cloud Cover"
+        },
+        "lcc": {
+            "shortname": "lcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "Low Cloud Cover"
+        },
+        "tcc": {
+            "shortname": "totcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "Total Cloud Cover"
+        },
+        "tp": {
+            "shortname": "twatp",
+            "unit": "kg m-2",
+            "formula": "None",
+            "desc": "Total Precipitation"
+        }
+    },
+    "grib1_keys": {
+        "11": "t",
+        "33": "u",
+        "34": "v",
+        "51": "q",
+        "52": "r",
+        "1": "prmsl"
+    },
+    "grib2_keys": {
+        "0.0.0": "t",
+        "0.2.2": "u",
+        "0.2.3": "v",
+        "0.1.0": "q",
+        "0.1.1": "r"
+    }
+}

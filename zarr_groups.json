@@ -1,0 +1,83 @@
+{
+    "description": "Configuration des groupes Zarr pour AROME/ALADIN",
+    "groups": {
+        "surface": {
+            "description": "Paramètres de surface (Niveau 0, 2m, 10m)",
+            "match": {
+                "level_types": [
+                    "surface"
+                ],
+                "exclude": [
+                    "RR3h",
+                    "RR6h",
+                    "RR12h",
+                    "RR24h"
+                ]
+            }
+        },
+        "alt_geo": {
+            "description": "Niveaux de hauteur (Hxxx)",
+            "match": {
+                "level_types": [
+                    "height"
+                ]
+            }
+        },
+        "alt_pression": {
+            "description": "Niveaux de pression (Pxxxxx)",
+            "match": {
+                "level_types": [
+                    "isobaric"
+                ]
+            }
+        },
+        "alt_pv": {
+            "description": "Niveaux de PV (Vxxx)",
+            "match": {
+                "level_types": [
+                    "pv"
+                ]
+            }
+        },
+        "model_levels": {
+            "description": "Niveaux modèle (Sxxx)",
+            "match": {
+                "level_types": [
+                    "model_level"
+                ]
+            }
+        },
+        "surface_3h": {
+            "description": "Cumuls 3h (Précipitations)",
+            "match": {
+                "parameters": [
+                    "RR3h"
+                ]
+            }
+        },
+        "surface_6h": {
+            "description": "Cumuls 6h (Précipitations)",
+            "match": {
+                "parameters": [
+                    "RR6h"
+                ]
+            }
+        },
+        "surface_12h": {
+            "description": "Cumuls 12h (Précipitations)",
+            "match": {
+                "parameters": [
+                    "RR12h"
+                ]
+            }
+        },
+        "surface_24h": {
+            "description": "Cumuls 24h (Précipitations)",
+            "match": {
+                "parameters": [
+                    "RR24h"
+                ]
+            }
+        }
+    }
+}
