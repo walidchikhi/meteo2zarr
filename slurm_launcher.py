@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-slurm_launcher.py — Lanceur SLURM pour la conversion NWP → Zarr
+slurm_launcher.py  Lanceur SLURM pour la conversion NWP  Zarr
 ================================================================
 
 Activation d'environnement virtuel (choisir UNE option) :
@@ -35,7 +35,7 @@ Usage :
       --modules python/3.11 hdf5/1.14 eccodes/2.31 \\
       --venv /scratch/user/nwp_env
 
-  # Plusieurs modèles en parallèle (job array)
+  # Plusieurs modeles en parallele (job array)
   python slurm_launcher.py multi_job \\
       --models arome,aladin \\
       --run 2026030100 \\
@@ -46,7 +46,7 @@ Usage :
   # Statut d'un job
   python slurm_launcher.py status --jobid 12345
 
-  # Générer un script cron
+  # GEnErer un script cron
   python slurm_launcher.py cron \\
       --models arome,aladin \\
       --runs-per-day 0 6 12 18 \\
@@ -68,21 +68,21 @@ from typing import List, Optional, Dict
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("slurm_launcher")
 
-# ----─
-# PROFILS HPC  —  adapter selon votre cluster
-# ----─
+# ----
+# PROFILS HPC    adapter selon votre cluster
+# ----
 
 MODEL_PROFILES: Dict[str, dict] = {
     "arome": {
-        "cpus_per_task": 32, "mem_gb": 32,  "time": "00:30:00",
+        "cpus_per_task": 32, "mem_gb": 32, "time": "00:20:00", 
         "partition": "Models", "read_threads": 16, "write_threads": 8,
     },
     "aladin": {
-        "cpus_per_task": 32, "mem_gb": 32,  "time": "00:10:00",
+        "cpus_per_task": 32, "mem_gb": 32,  "time": "00:20:00",
         "partition": "Models", "read_threads": 16, "write_threads": 8,
     },
     "arpege": {
-        "cpus_per_task": 48, "mem_gb": 32, "time": "00:20:00",
+        "cpus_per_task": 32, "mem_gb": 32, "time": "00:40:00",
         "partition": "Models",  "read_threads": 24, "write_threads": 8,
     },
     "gfs": {
@@ -92,8 +92,8 @@ MODEL_PROFILES: Dict[str, dict] = {
     "default": {
         "cpus_per_task": 16, "mem_gb": 32,  "time": "00:15:00",
         "partition": "Models", "read_threads": 8,  "write_threads": 4,
-    },
-}
+        },
+    }
 
 # Chemins relatifs au script courant
 SCRIPT_DIR       = Path(__file__).resolve().parent
@@ -101,9 +101,9 @@ CONVERTER_SCRIPT = SCRIPT_DIR / "core_hpc.py"
 CONFIG_DIR       = SCRIPT_DIR
 
 
-# ----─
-# GÉNÉRATEUR DE SCRIPTS SBATCH
-# ----─
+# ----
+# GENERATEUR DE SCRIPTS SBATCH
+# ----
 
 def _build_script(lines: List[str]) -> str:
     """
@@ -125,14 +125,14 @@ def _resolve_python(
     python_version: str           = "python3",
 ) -> str:
     """
-    Retourne le chemin vers le bon interpréteur Python.
+    Retourne le chemin vers le bon interprEteur Python.
 
     Avec un venv :
-      1. Cherche le binaire explicitement demandé  (ex: python3.12)
-      2. Sinon scanne venv/bin/ pour le python3.x le plus récent
+      1. Cherche le binaire explicitement demandE  (ex: python3.12)
+      2. Sinon scanne venv/bin/ pour le python3.x le plus rEcent
       3. Sinon python3, python
-      4. Si le venv n'existe pas localement, retourne le chemin calculé
-         (il sera présent sur le nœud de calcul)
+      4. Si le venv n'existe pas localement, retourne le chemin calculE
+         (il sera prEsent sur le nœud de calcul)
     """
     ver = python_version.strip()
     requested = ver if ver.startswith("python") else f"python{ver}"
@@ -140,10 +140,10 @@ def _resolve_python(
     if venv:
         bin_dir = Path(venv) / "bin"
 
-        # Candidats dans l'ordre de priorité :
-        # 1. Le binaire explicitement demandé  (ex: python3.12)
-        # 2. Tous les python3.x versionnés du venv, triés par version décroissante
-        # 3. python3 générique, python
+        # Candidats dans l'ordre de prioritE :
+        # 1. Le binaire explicitement demandE  (ex: python3.12)
+        # 2. Tous les python3.x versionnEs du venv, triEs par version dEcroissante
+        # 3. python3 gEnErique, python
         if bin_dir.exists():
             versioned = sorted(
                 [p.name for p in bin_dir.iterdir()
@@ -156,16 +156,16 @@ def _resolve_python(
         else:
             versioned = []
 
-        # Ordre de priorité :
-        # 1. Binaire explicitement demandé (ex: python3.12)
-        # 2. Autres python3.x versionnés trouvés dans le venv (plus récent en premier)
-        # 3. python3 / python génériques — UNIQUEMENT si aucun versionné n'existe
+        # Ordre de prioritE :
+        # 1. Binaire explicitement demandE (ex: python3.12)
+        # 2. Autres python3.x versionnEs trouvEs dans le venv (plus rEcent en premier)
+        # 3. python3 / python gEnEriques  UNIQUEMENT si aucun versionnE n'existe
         if versioned:
             candidates = [requested] + versioned
         else:
             candidates = [requested, "python3", "python"]
 
-        # Dédupliquer en gardant l'ordre
+        # DEdupliquer en gardant l'ordre
         seen, ordered = set(), []
         for c in candidates:
             if c not in seen:
@@ -174,15 +174,15 @@ def _resolve_python(
 
         for candidate in ordered:
             p = bin_dir / candidate
-            # Si on a des binaires versionnés, ignorer python3/python génériques
+            # Si on a des binaires versionnEs, ignorer python3/python gEnEriques
             if versioned and candidate in ("python3", "python"):
                 continue
             if p.exists() and os.access(str(p), os.X_OK):
                 if candidate != requested:
-                    print(f"  ℹ  '{requested}' absent du venv → utilisation de '{candidate}'")
+                    print(f"  ℹ  '{requested}' absent du venv  utilisation de '{candidate}'")
                 return str(p)
 
-        # Venv absent localement (nœud de calcul) → retourner le chemin demandé
+        # Venv absent localement (nœud de calcul)  retourner le chemin demandE
         return str(bin_dir / requested)
 
     return requested
@@ -195,12 +195,12 @@ def _env_activation_lines(
     python_bin:     str                 = "python3",
 ) -> List[str]:
     """
-    Génère les lignes d'environnement pour le script SBATCH.
+    GEnere les lignes d'environnement pour le script SBATCH.
 
-    Pour venv  : PAS de 'source activate' — on utilise le binaire absolu directement.
-                 On ajoute juste une vérification que le binaire existe.
+    Pour venv  : PAS de 'source activate'  on utilise le binaire absolu directement.
+                 On ajoute juste une vErification que le binaire existe.
     Pour conda : 'conda activate' obligatoire car conda modifie le PATH pour
-                 les bibliothèques C (HDF5, eccodes...).
+                 les bibliotheques C (HDF5, eccodes...).
     """
     lines = []
 
@@ -214,7 +214,7 @@ def _env_activation_lines(
             lines.append(f"module load {mod}")
         lines.append("")
 
-    # - 2. Conda (nécessite activate pour les libs C) ----─
+    # - 2. Conda (nEcessite activate pour les libs C) ----
     if conda_env:
         lines += [
             "# - Conda --",
@@ -226,29 +226,29 @@ def _env_activation_lines(
             'fi',
             '[ -z "$CONDA_BASE" ] && echo " conda introuvable" && exit 1',
             'source "$CONDA_BASE/etc/profile.d/conda.sh"',
-            f'conda activate "{conda_env}" || {{ echo " conda activate échoué"; exit 1; }}',
+            f'conda activate "{conda_env}" || {{ echo " conda activate EchouE"; exit 1; }}',
             "",
         ]
 
-    # - 3. Venv : vérification du binaire seulement (pas de source activate) -
+    # - 3. Venv : vErification du binaire seulement (pas de source activate) -
     elif venv:
         lines += [
             "# - Python venv -",
             f'PYTHON_BIN="{python_bin}"',
             'if [ ! -e "$PYTHON_BIN" ]; then',
             f'    echo " Python introuvable : $PYTHON_BIN"',
-            f'    echo " Vérifiez --venv et --python"',
+            f'    echo " VErifiez --venv et --python"',
             '    exit 1',
             'fi',
             "",
         ]
 
-    # - 4. Vérification finale ----
+    # - 4. VErification finale ----
     lines += [
-        "# - Vérification environnement -----─",
+        "# - VErification environnement -----",
         f'echo "Python bin : {python_bin}"',
-        f'"{python_bin}" --version || {{ echo " python --version échoué"; exit 1; }}',
-        f'"{python_bin}" -c "import numpy, xarray, zarr; print(\'✅ numpy\', numpy.__version__, \'| xarray\', xarray.__version__, \'| zarr OK\')" || {{ echo " imports échoués — venv incomplet ?"; exit 1; }}',
+        f'"{python_bin}" --version || {{ echo " python --version EchouE"; exit 1; }}',
+        f'"{python_bin}" -c "import numpy, xarray, zarr; print(\' numpy\', numpy.__version__, \'| xarray\', xarray.__version__, \'| zarr OK\')" || {{ echo " imports EchouEs  venv incomplet ?"; exit 1; }}',
         "",
     ]
 
@@ -276,9 +276,8 @@ def make_sbatch_single(
     dashboard_address: str               = "0.0.0.0",
     dashboard_port:  int                 = 3112,
 ) -> str:
-    """Génère un script SBATCH pour 1 modèle / 1 run."""
-
-    jname    = f"nwp2zarr_{model}_{run}"
+    """GEnere un script SBATCH pour 1 modele / 1 run."""
+    jname    = f"nwp2zarr_{Path(output_dir).name}_{run}"
     mem      = f"{profile['mem_gb']}G"
     rt       = profile["read_threads"]
     wt       = profile["write_threads"]
@@ -294,6 +293,7 @@ def make_sbatch_single(
         f"#SBATCH --ntasks=1",
         f"#SBATCH --cpus-per-task={cpus}",
         f"#SBATCH --mem={mem}",
+        f"#SBATCH --exclusive",
         f"#SBATCH --time={profile['time']}",
         f"#SBATCH --partition={profile['partition']}",
         f"#SBATCH --output={jname}.out",
@@ -312,7 +312,7 @@ def make_sbatch_single(
         venv=venv, conda_env=conda_env, modules=modules, python_bin=python
     )
 
-    # - Variables d'environnement ----─
+    # - Variables d'environnement ----
     lines += [
         f"export NWP_READ_THREADS={rt}",
         f"export NWP_WRITE_THREADS={wt}",
@@ -321,10 +321,10 @@ def make_sbatch_single(
         "",
     ]
 
-    # - Infos ------─
+    # - Infos ------
     lines += [
         'echo "=== NWP2ZARR Start: $(date) ==="',
-        f'echo "Modèle  : {model}"',
+        f'echo "Modele  : {model}"',
         f'echo "Run     : {run}"',
         f'echo "Nœud    : $(hostname)"',
         f'echo "CPUs    : $SLURM_CPUS_PER_TASK"',
@@ -361,7 +361,7 @@ def make_sbatch_single(
     lines += [
         "",
         "EXIT_CODE=$?",
-        'echo "=== Job terminé: $(date) | Code: $EXIT_CODE ==="',
+        'echo "=== Job terminE: $(date) | Code: $EXIT_CODE ==="',
         "exit $EXIT_CODE",
     ]
 
@@ -385,9 +385,9 @@ def make_sbatch_array(
     dashboard_address: str               = "0.0.0.0",
     dashboard_port:  int                 = 3112,
 ) -> str:
-    """Génère un job array SLURM (1 task par modèle)."""
+    """GEnere un job array SLURM (1 task par modele)."""
 
-    # Profil le plus exigeant comme référence
+    # Profil le plus exigeant comme rEfErence
     max_cpu = max(MODEL_PROFILES.get(m, MODEL_PROFILES["default"])["cpus_per_task"] for m in models)
     max_mem = max(MODEL_PROFILES.get(m, MODEL_PROFILES["default"])["mem_gb"]         for m in models)
     max_time = sorted(
@@ -404,6 +404,7 @@ def make_sbatch_array(
         f"#SBATCH --ntasks=1",
         f"#SBATCH --cpus-per-task={max_cpu}",
         f"#SBATCH --mem={max_mem}G",
+        f"#SBATCH --exclusive",
         f"#SBATCH --time={max_time}",
         f"#SBATCH --partition={partition}",
         f"#SBATCH --array=0-{len(models)-1}",
@@ -419,7 +420,7 @@ def make_sbatch_array(
         python_bin=_resolve_python(venv, conda_env, python_version)
     )
 
-    # Tableaux bash modèles / formats / inputs
+    # Tableaux bash modeles / formats / inputs
     model_arr  = " ".join(models)
     fmt_arr    = " ".join(
         MODEL_PROFILES.get(m, {}).get("fmt", "fa") for m in models
@@ -465,15 +466,15 @@ def make_sbatch_array(
         f"    --dt-hours {dt_hours} \\",
         f"    --dashboard-address 0.0.0.0:{dashboard_port}",
         "",
-        'echo "=== $MODEL terminé: $(date) ==="',
+        'echo "=== $MODEL terminE: $(date) ==="',
     ]
 
     return _build_script(lines)
 
 
-# ----─
+# ----
 # SOUMISSION SLURM
-# ----─
+# ----
 
 def submit_job(
     script:      str,
@@ -483,21 +484,21 @@ def submit_job(
 ) -> Optional[str]:
     """Sauvegarde le script et le soumet via sbatch."""
 
-    # Sauvegarde systématique pour audit
+    # Sauvegarde systEmatique pour audit
     scripts_dir.mkdir(parents=True, exist_ok=True)
     ts          = datetime.now().strftime("%Y%m%d_%H%M%S")
     script_path = scripts_dir / f"{job_label}_{ts}.sh"
     script_path.write_text(script)
-    print(f"📝 Script sauvé: {script_path}")
+    print(f"📝 Script sauvE: {script_path}")
 
     if dry_run:
         print("🔍 [DRY RUN] Contenu du script :")
-        print("─" * 60)
+        print("" * 60)
         print(script)
-        print("─" * 60)
+        print("" * 60)
         return None
 
-    # Vérification préalable : le script commence bien par #!/bin/bash
+    # VErification prEalable : le script commence bien par #!/bin/bash
     first_line = script.split("\n")[0]
     if not first_line.startswith("#!"):
         print(f" Le script ne commence pas par un shebang : {repr(first_line)}")
@@ -512,14 +513,14 @@ def submit_job(
 
     if result.returncode != 0:
         print(f" Erreur sbatch: {result.stderr.strip()}")
-        # Afficher les premières lignes pour diagnostic
-        print("   Début du script soumis :")
+        # Afficher les premieres lignes pour diagnostic
+        print("   DEbut du script soumis :")
         for i, line in enumerate(script.split("\n")[:5]):
             print(f"   L{i+1}: {repr(line)}")
         return None
 
     job_id = result.stdout.strip().split(";")[0]
-    print(f"✅ Job soumis: {job_id}")
+    print(f" Job soumis: {job_id}")
     return job_id
 
 
@@ -568,7 +569,7 @@ def wait_for_jobs(job_ids: List[str], poll: int = 15, timeout: int = 3600):
         for jid in list(pending):
             s = get_job_status(jid.split("_")[0])
             if s["state"] in ("COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "NODE_FAIL"):
-                icon = "✅" if s["state"] == "COMPLETED" else ""
+                icon = "" if s["state"] == "COMPLETED" else ""
                 print(f"  {icon} Job {jid}: {s['state']} (elapsed={s.get('elapsed','?')})")
                 done.add(jid)
         pending -= done
@@ -586,7 +587,7 @@ def make_cron_script(
     conda_env:     Optional[str] = None,
     out_script:    Optional[str] = None,
 ) -> str:
-    """Génère un script shell exécutable par cron."""
+    """GEnere un script shell exEcutable par cron."""
     runs_str   = " ".join(str(r) for r in runs_per_day)
     models_str = " ".join(models)
     out        = out_script or str(SCRIPT_DIR / "cron_nwp2zarr.sh")
@@ -594,7 +595,7 @@ def make_cron_script(
 
     lines = [
         "#!/bin/bash",
-        "# Auto-généré par slurm_launcher.py",
+        "# Auto-gEnErE par slurm_launcher.py",
         "# Cron : 5 * * * * /chemin/vers/cron_nwp2zarr.sh >> /var/log/nwp2zarr.log 2>&1",
         "",
         f"MODELS='{models_str}'",
@@ -653,23 +654,23 @@ def make_cron_script(
     script = _build_script(lines)
     Path(out).write_text(script)
     Path(out).chmod(0o755)
-    print(f"📅 Script cron écrit: {out}")
+    print(f" Script cron Ecrit: {out}")
     return script
 
 
-# ----─
+# ----
 # CLI
-# ----─
+# ----
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Lanceur SLURM — NWP → Zarr",
+        description="Lanceur SLURM  NWP  Zarr",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     sub = parser.add_subparsers(dest="mode", required=True)
 
     # - single_job ------
-    p = sub.add_parser("single_job", help="1 job pour 1 modèle")
+    p = sub.add_parser("single_job", help="1 job pour 1 modele")
     p.add_argument("--model",         required=True)
     p.add_argument("--run",           required=True, help="YYYYMMDDHH")
     p.add_argument("--input",         required=True)
@@ -687,7 +688,7 @@ def main():
     p.add_argument("--modules",       nargs="+", default=[],
                    help="Modules HPC à charger (module load)")
     p.add_argument("--python",        default="python3",
-                   help="Version Python à utiliser, ex: 3.12 ou python3.12 (défaut: python3)")
+                   help="Version Python à utiliser, ex: 3.12 ou python3.12 (dEfaut: python3)")
     p.add_argument("--dask-workers",  type=int,   default=4)
     p.add_argument("--read-threads",  type=int,   default=None, help="Overfide read_threads")
     p.add_argument("--write-threads", type=int,   default=None, help="Override write_threads")
@@ -699,8 +700,8 @@ def main():
     p.add_argument("--wait",           action="store_true")
     p.add_argument("--log-dir",       default=None)
 
-    # - multi_job ------─
-    p2 = sub.add_parser("multi_job", help="N modèles en job array")
+    # - multi_job ------
+    p2 = sub.add_parser("multi_job", help="N modeles en job array")
     p2.add_argument("--models",       required=True, help="Ex: arome,aladin")
     p2.add_argument("--run",          required=True)
     p2.add_argument("--input-base",   required=True)
@@ -728,7 +729,7 @@ def main():
     p3.add_argument("--jobid", required=True)
 
     # - cron -------
-    p4 = sub.add_parser("cron", help="Générer un script cron")
+    p4 = sub.add_parser("cron", help="GEnErer un script cron")
     p4.add_argument("--models",        required=True)
     p4.add_argument("--runs-per-day",  nargs="+", type=int, default=[0, 6, 12, 18])
     p4.add_argument("--input-base",    required=True)
@@ -741,7 +742,7 @@ def main():
 
     args = parser.parse_args()
 
-    # - Traitement par mode -----─
+    # - Traitement par mode -----
 
     if args.mode == "single_job":
         profile = MODEL_PROFILES.get(args.model, MODEL_PROFILES["default"]).copy()

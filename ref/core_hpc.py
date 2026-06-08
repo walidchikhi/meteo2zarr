@@ -30,9 +30,11 @@ from typing import Dict, List, Optional, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 import dask
 import dask.array as da
+import dask.array as dsa
 from dask.distributed import Client, LocalCluster
 import zarr
 import numcodecs
@@ -77,6 +79,7 @@ GRIB_LEVEL_TYPES = [
     "surface",
     "meanSea",
     "potentialVorticity",
+    "entireAtmosphere",
     "theta",
 ]
 
@@ -228,6 +231,25 @@ def apply_formula_lazy(da: xr.DataArray, formula: str) -> xr.DataArray:
     return da
 
 
+def apply_formula_np(arr: np.ndarray, formula: str) -> np.ndarray:
+    """
+    Applique une formule physique sur un tableau numpy (eccodes reader).
+    """
+    if not formula or formula in ("None", "none", "", "acc"):
+        return arr
+    if formula == "k2c":
+        return arr - 273.15
+    if formula == "div98":
+        return arr / 9.80665
+    if formula == "percent":
+        mask = arr <= 1.0
+        result = arr.copy()
+        result[mask] = arr[mask] * 100.0
+        return result
+    logger.debug(f"  Formule numpy inconnue '{formula}', ignorée")
+    return arr
+
+
 def _read_fa_job(fa_path: Path, cfg: ConfigLoader) -> Optional[xr.Dataset]:
     """Job de lecture FA isolé pour ProcessPool (évite les Segfaults de threads epygram)."""
     # On instancie un reader local au process
@@ -353,132 +375,307 @@ class FAReader:
 
 class GRIBReader:
     """
-    Lecteur GRIB1/GRIB2 via cfgrib.
-    Supporte 1 fichier monolithique (toutes les échéances) ou N fichiers.
-    Utilise xr.open_mfdataset pour la lecture lazy Dask.
+    Lecteur GRIB1/GRIB2 via eccodes (lecture directe des messages).
+    
+    Pour chaque fichier GRIB, on lit les messages un par un avec eccodes,
+    on les organise par (shortname, typeOfLevel, level), et on construit
+    des DataArrays xarray avec les dimensions (time, [level,] lat, lon).
+    
+    Avantages vs cfgrib :
+      - Aucun problème de conflits d'unités CF
+      - Contrôle total sur chaque message
+      - Compatible GRIB1 et GRIB2
     """
 
-    # Types de niveaux à tenter
-    LEVEL_TYPES = GRIB_LEVEL_TYPES
-
     def __init__(self, cfg: ConfigLoader, chunk_time: int = 6):
-        self.grib_defs  = cfg.grib_defs.get("fields", {})
         self.cfg        = cfg
+        self.grib_defs  = cfg.grib_defs.get("fields", {})
+        self.ltype_map  = cfg.grib_defs.get("level_type_map", {})
+        self.g2_map     = cfg.grib_defs.get("grib2_param_map", {})
+        self.g1_map     = cfg.grib_defs.get("grib1_param_map", {})
+        self.skip_sn    = set(cfg.grib_defs.get("skip_shortnames", []))
         self.chunk_time = chunk_time
 
+    # ------------------------------------------------------------------ #
+    # Public                                                               #
+    # ------------------------------------------------------------------ #
     def read_all(self, files: List[Path]) -> Optional[xr.Dataset]:
-        """
-        Lit un ou plusieurs fichiers GRIB de façon lazy via cfgrib.
-        Gère les conflits de niveaux en lisant par typeOfLevel.
-        """
-        if not HAS_CFGRIB:
-            raise RuntimeError("cfgrib non installé — pip install cfgrib")
+        """Lit un ou plusieurs fichiers GRIB et retourne un Dataset xarray."""
+        try:
+            import eccodes
+        except ImportError:
+            raise RuntimeError("eccodes non installé — pip install eccodes")
 
-        all_datasets: List[xr.Dataset] = []
+        # Structures de collecte :
+        # key = (shortname_std, level_type_std, level_value)
+        # value = dict: valid_time (pd.Timestamp) -> np.ndarray (lat, lon)
+        buckets: Dict[tuple, Dict] = {}
+        lats = lons = None
 
-        for ltype in self.LEVEL_TYPES:
-            ds_ltype = self._open_level_type(files, ltype)
-            if ds_ltype is not None:
-                all_datasets.append(ds_ltype)
+        for fpath in files:
+            self._read_file(fpath, buckets)
 
-        if not all_datasets:
-            logger.warning("  ⚠  Aucune donnée GRIB lue")
+        if not buckets:
+            logger.warning("  ⚠  Aucune donnée GRIB lue (eccodes)")
             return None
 
-        # Merge des types de niveaux
-        try:
-            merged = xr.merge(all_datasets, compat="override")
-        except Exception:
-            merged = all_datasets[0]
+        return self._build_dataset(buckets)
 
-        # Normalisation via grib_fields table
-        return self._normalize(merged)
-
-    def _open_level_type(self, files: List[Path], ltype: str) -> Optional[xr.Dataset]:
-        """Ouvre les fichiers pour un type de niveau donné, lazy."""
-        filter_keys = {"typeOfLevel": ltype}
-        str_files   = [str(f) for f in files]
+    # ------------------------------------------------------------------ #
+    # Private : lecture eccodes                                            #
+    # ------------------------------------------------------------------ #
+    def _read_file(self, fpath: Path, buckets: Dict[tuple, Dict]):
+        import eccodes
 
         try:
-            if len(files) == 1:
-                ds = xr.open_dataset(
-                    str_files[0],
-                    engine="cfgrib",
-                    backend_kwargs={"filter_by_keys": filter_keys, "indexpath": None},
-                    chunks={"time": self.chunk_time},   # Dask lazy
-                )
-            else:
-                # Plusieurs fichiers (1 par échéance)
-                ds = xr.open_mfdataset(
-                    str_files,
-                    engine="cfgrib",
-                    combine="nested",
-                    concat_dim="time",
-                    parallel=True,                         # Dask //
-                    backend_kwargs={"filter_by_keys": filter_keys, "indexpath": None},
-                    chunks={"time": self.chunk_time},
-                )
-            return ds
-        except Exception:
-            return None   # Ce typeOfLevel absent dans ces fichiers → OK
+            f = open(str(fpath), "rb")
+        except OSError as e:
+            logger.warning(f"  ⚠ Impossible d'ouvrir {fpath.name}: {e}")
+            return
 
-    def _normalize(self, ds: xr.Dataset) -> xr.Dataset:
-        """Renomme et applique les formules selon grib_fields table."""
+        n_msg = n_kept = 0
+        try:
+            while True:
+                msg = eccodes.codes_grib_new_from_file(f)
+                if msg is None:
+                    break
+                n_msg += 1
+                try:
+                    self._process_message(msg, buckets)
+                    n_kept += 1
+                except Exception as e:
+                    logger.warning(f"  ⛔ Message {n_msg} ignoré: {e}")
+                finally:
+                    eccodes.codes_release(msg)
+        finally:
+            f.close()
+
+        logger.info(f"  📖 {fpath.name}: {n_kept}/{n_msg} messages conservés, buckets={len(buckets)}")
+
+    def _process_message(self, msg, buckets: Dict[tuple, Dict]):
+        import eccodes
+
+        # -------- 1. Identification du paramètre --------
+        edition = eccodes.codes_get(msg, "edition", ktype=int)
+
+        if edition == 2:
+            disc = eccodes.codes_get(msg, "discipline", ktype=int)
+            cat  = eccodes.codes_get(msg, "parameterCategory", ktype=int)
+            num  = eccodes.codes_get(msg, "parameterNumber", ktype=int)
+            g2key = f"{disc}.{cat}.{num}"
+            sn_grib = self.g2_map.get(g2key)
+            if not sn_grib:
+                # Essai via shortName eccodes
+                try:
+                    sn_grib = eccodes.codes_get(msg, "shortName", ktype=str)
+                except Exception:
+                    return
+        else:  # GRIB1
+            try:
+                param = str(eccodes.codes_get(msg, "indicatorOfParameter", ktype=int))
+                sn_grib = self.g1_map.get(param)
+                if not sn_grib:
+                    sn_grib = eccodes.codes_get(msg, "shortName", ktype=str)
+            except Exception:
+                return
+
+        if not sn_grib:
+            return
+
+        # Cherche la définition
+        field_def = self.grib_defs.get(sn_grib)
+        if field_def:
+            shortname_std = field_def["shortname"]
+            formula       = field_def.get("formula", "None")
+            units_std     = field_def.get("unit", "unknown")
+            desc_std      = field_def.get("desc", sn_grib)
+        else:
+            # Champ non mappé → on skip
+            return
+
+        # Skip si dans la liste d'exclusion
+        if shortname_std in self.skip_sn or sn_grib in self.skip_sn:
+            return
+
+        # -------- 2. Level type & valeur --------
+        try:
+            ltype_grib = eccodes.codes_get(msg, "typeOfLevel", ktype=str)
+            level_val  = eccodes.codes_get(msg, "level", ktype=int)
+        except Exception:
+            ltype_grib = "surface"
+            level_val  = 0
+
+        ltype_std = self.ltype_map.get(ltype_grib, "surface")
+
+        # Pour les niveaux hauteur (heightAboveGround), on intègre la hauteur
+        # dans le nom pour distinguer 2t de u10v, etc.
+        # Ex : "2t" (niveau 2m), "10u" (niveau 10m) → on conserve le shortname
+        # Pour isobaricInhPa, on crée une dimension 'level' dans DataArray
+
+        # -------- 3. Temps (valid_time ou step) --------
+        try:
+            # dataDate + dataTime (HHMM)
+            date_int = eccodes.codes_get(msg, "dataDate", ktype=int)  # YYYYMMDD
+            time_int = eccodes.codes_get(msg, "dataTime", ktype=int)  # HHMM
+            step_h   = eccodes.codes_get(msg, "stepRange", ktype=str)
+            # stepRange peut être "0" ou "0-3" pour des cumuls
+            # On extrait le temps d'échéance (fin du range)
+            step_end = int(step_h.split("-")[-1]) if step_h else 0
+
+            base_time = pd.Timestamp(
+                year=date_int // 10000,
+                month=(date_int % 10000) // 100,
+                day=date_int % 100,
+                hour=time_int // 100,
+                minute=time_int % 100,
+            )
+            valid_time = base_time + pd.Timedelta(hours=step_end)
+        except Exception:
+            valid_time = pd.Timestamp("1970-01-01")
+
+        # -------- 4. Grille (lat/lon + valeurs) --------
+        try:
+            values = eccodes.codes_get_values(msg).astype("float32")
+            ni = eccodes.codes_get(msg, "Ni", ktype=int)
+            nj = eccodes.codes_get(msg, "Nj", ktype=int)
+            # Latitudes et longitudes (uniquement si grille régulière)
+            lats_flat = eccodes.codes_get_array(msg, "latitudes")
+            lons_flat = eccodes.codes_get_array(msg, "longitudes")
+        except Exception as e:
+            raise ValueError(f"Impossible de lire les valeurs: {e}")
+
+        # Reshape en (nj, ni)
+        try:
+            arr = values.reshape(nj, ni)
+            lats_2d = lats_flat.reshape(nj, ni)
+            lons_2d = lons_flat.reshape(nj, ni)
+        except Exception:
+            # Grille non régulière ou taille incohérente
+            raise ValueError("Reshape impossible")
+
+        # Coordonnées 1D (on prend la 1ère ligne/colonne → grille lon/lat-régulière)
+        lat_1d = lats_2d[:, 0]
+        lon_1d = lons_2d[0, :]
+
+        # -------- 5. Application de la formule --------
+        arr = apply_formula_np(arr, formula)
+
+        # -------- 6. Remplacement dans les buckets --------
+        bucket_key = (shortname_std, ltype_std, level_val)
+        if bucket_key not in buckets:
+            buckets[bucket_key] = {
+                "times": [],
+                "arrays": [],
+                "lat": lat_1d,
+                "lon": lon_1d,
+                "units": units_std,
+                "desc": desc_std,
+                "ltype": ltype_std,
+                "level": level_val,
+                "accum_formula": formula == "acc",
+            }
+        b = buckets[bucket_key]
+        b["times"].append(valid_time)
+        b["arrays"].append(arr)
+
+    # ------------------------------------------------------------------ #
+    # Private : construction Dataset xarray                                #
+    # ------------------------------------------------------------------ #
+    def _build_dataset(self, buckets: Dict[tuple, Dict]) -> xr.Dataset:
+        import dask.array as dsa
+
         data_vars: Dict[str, xr.DataArray] = {}
 
-        for var in ds.data_vars:
-            meta = self.grib_defs.get(str(var))
-            # Tenter avec le nom court extrait des attrs GRIB
-            short = ds[var].attrs.get("GRIB_shortName", "")
-            meta  = self.grib_defs.get(short)
-
-            if not meta:
-                # GRIB1: Tenter via indicatorOfParameter
-                g1 = str(ds[var].attrs.get("GRIB_indicatorOfParameter", ""))
-                if g1 in self.cfg.grib_defs.get("grib1_keys", {}):
-                    sn = self.cfg.grib_defs["grib1_keys"][g1]
-                    meta = self.grib_defs.get(sn)
-
-            if not meta:
-                # GRIB2: Tenter via discipline.category.number
-                d = ds[var].attrs.get("GRIB_discipline")
-                c = ds[var].attrs.get("GRIB_parameterCategory")
-                n = ds[var].attrs.get("GRIB_parameterNumber")
-                if d is not None and c is not None and n is not None:
-                    g2 = f"{d}.{c}.{n}"
-                    if g2 in self.cfg.grib_defs.get("grib2_keys", {}):
-                        sn = self.cfg.grib_defs["grib2_keys"][g2]
-                        meta = self.grib_defs.get(sn)
-            if not meta:
-                # Variable non référencée → on la garde avec ses noms originaux
-                new_name = str(var)
-                da_      = ds[var].astype("float32")
-                desc     = ds[var].attrs.get("long_name", new_name)
-                unit     = ds[var].attrs.get("units", "unknown")
-                formula  = "None"
+        # On itère directement sur chaque bucket (un bucket = une variable 3D unique)
+        for key, b in buckets.items():
+            sn_std, ltype_std, lv = key
+            lats  = b["lat"]
+            lons  = b["lon"]
+            units = b["units"]
+            desc  = b["desc"]
+            
+            # Naming logic : on aplatit le niveau dans le nom pour Titiler (3D uniquement)
+            # - isobaric/pv : t + 850 -> t850
+            # - surface/height : 2t -> 2t (pas de suffixe si déjà présent), t + 2 -> t2
+            if ltype_std in ("isobaric", "pv") and lv > 0:
+                var_name = f"{sn_std}{lv}"
+            elif lv > 0 and str(lv) not in sn_std:
+                var_name = f"{sn_std}{lv}"
             else:
-                new_name = meta["shortname"]
-                formula  = meta.get("formula", "None")
-                da_      = apply_formula_lazy(ds[var].astype("float32"), formula)
-                desc     = meta["desc"]
-                unit     = meta["unit"]
+                var_name = sn_std
 
-            da_.name = new_name
-            da_.attrs.update({
-                "units":      unit,
-                "long_name":  desc,
-                "grib_name":  str(var),
-                "level_type": ds[var].attrs.get("GRIB_typeOfLevel", "surface"),
-                "shortname":  new_name,
-            })
-            viz = self.cfg.get_viz(new_name)
+            # Axe temps unifié pour ce bucket
+            times_sorted = sorted(set(b["times"]))
+            nt = len(times_sorted)
+            time_idx = {t: i for i, t in enumerate(times_sorted)}
+
+            ny, nx = len(lats), len(lons)
+            arr_3d = np.full((nt, ny, nx), np.nan, dtype="float32")
+            
+            for t, a in zip(b["times"], b["arrays"]):
+                arr_3d[time_idx[t]] = a
+
+            da = xr.DataArray(
+                dsa.from_array(arr_3d, chunks=(min(nt, self.chunk_time), ny, nx)),
+                dims=("time", "latitude", "longitude"),
+                coords={
+                    "time":      np.array([t.value // 10**9 for t in times_sorted], dtype="float64"),
+                    "latitude":  lats.astype("float64"),
+                    "longitude": lons.astype("float64"),
+                },
+                name=var_name,
+            )
+
+            # Métadonnées
+            da.attrs = {
+                "units":      units,
+                "long_name":  f"{desc} (lvl {lv})" if lv > 0 else desc,
+                "level_type": ltype_std,
+                "level":      float(lv),
+                "shortname":  var_name,
+            }
+            # Encodage du temps
+            da.coords["time"].attrs = {
+                "units":         "seconds since 1970-01-01 00:00:00",
+                "standard_name": "time",
+                "long_name":     "Valid time",
+                "axis":          "T",
+            }
+            viz = self.cfg.get_viz(sn_std)
             if viz:
-                da_.attrs["viz"] = json.dumps(viz)
+                da.attrs["viz"] = json.dumps(viz)
+            
+            # Gestion des collisions de noms (rare mais possible)
+            if var_name in data_vars:
+                logger.warning(f"  ⚠ Collision de nom variable: {var_name} (ltype={ltype_std}, lv={lv})")
+                var_name = f"{var_name}_{ltype_std}"
+            
+            data_vars[var_name] = da
 
-            data_vars[new_name] = da_
+        logger.info(f"  📂 GRIB (eccodes): {len(data_vars)} variables (flat levels)")
 
-        logger.info(f"  📂 GRIB: {len(data_vars)}/{len(ds.data_vars)} variables reconnues")
-        return xr.Dataset(data_vars)
+        # Merge en un seul Dataset
+        ds_list = [da.to_dataset() for da in data_vars.values()]
+        try:
+            merged = xr.merge(ds_list, compat="override", join="outer")
+        except Exception as e:
+            logger.error(f"  ❌ Erreur merge GRIB: {e}")
+            merged = ds_list[0] if ds_list else xr.Dataset()
+
+        return merged
+
+        logger.info(f"  📂 GRIB (eccodes): {len(data_vars)} variables")
+
+        # Merge en un seul Dataset (compat=override pour différents niveaux)
+        ds_list = []
+        for sn, da in data_vars.items():
+            ds_list.append(da.to_dataset())
+        try:
+            merged = xr.merge(ds_list, compat="override", join="outer")
+        except Exception:
+            merged = ds_list[0] if ds_list else xr.Dataset()
+
+        return merged
 
 
 class NetCDFReader:
@@ -625,7 +822,11 @@ class AccumulationProcessor:
     """
 
     def __init__(self, cfg: ConfigLoader):
-        self.acc_defs = cfg.fa_defs.get("accumulations", {})
+        # Fusionne les définitions de cumuls FA et GRIB
+        fa_accum   = cfg.fa_defs.get("accumulations", {})
+        grib_accum = cfg.grib_defs.get("accumulations", {})
+        # GRIB en priorité car les shortnames ont déjà été normalisés
+        self.acc_defs = {**fa_accum, **grib_accum}
         self.cfg      = cfg
 
     def process(self, ds: xr.Dataset, dt_hours: float = 1.0) -> xr.Dataset:
@@ -668,7 +869,7 @@ class AccumulationProcessor:
                 # Le nom final dans le Zarr sera "tp" dans le dossier surface_3h/
                 tgt_id = f"{src_var}_{hours}h"
 
-                # Décumulage vectorisé
+                # Décumulage vectorisé : RR_N(T) = Acc(T) - Acc(T - N)
                 diff          = np.empty_like(src)
                 diff[:steps]  = np.nan
                 diff[steps:]  = np.maximum(src[steps:] - src[:-steps], 0.0)
@@ -686,6 +887,7 @@ class AccumulationProcessor:
                         "shortname":  src_var,   # On garde le nom de base ici
                         "level_type": "surface",
                         "acc_hours":  hours,
+                        "dt_hours":   dt_hours,
                     },
                 )
                 viz = self.cfg.get_viz(src_var)
@@ -797,6 +999,21 @@ class ZarrGroupPartitioner:
                 if rename_map:
                     gds = gds.rename(rename_map)
                     logger.info(f"   ✓ Renommage {gname}: {list(rename_map.keys())} → {list(rename_map.values())}")
+
+            # Slicing temporel pour les groupes à durée (ex: 3h commence à H03)
+            # On suppose un pas de temps dt_hours (attribut présent dans les DataArrays de cumul)
+            if mg:
+                hours = int(mg.group(1))
+                # On cherche le max dt_hours parmi les variables du groupe (souvent 1.0)
+                dts = [gds[v].attrs.get("dt_hours", 1.0) for v in gds.data_vars if "dt_hours" in gds[v].attrs]
+                dt = dts[0] if dts else 1.0
+                steps = round(hours / dt)
+                
+                if steps < gds.sizes["time"]:
+                    gds = gds.isel(time=slice(steps, None))
+                    logger.info(f"   ✓ Troncature {gname}: commence à l'indice {steps} (H{hours})")
+                else:
+                    logger.warning(f"   ⚠ Troncature {gname} impossible: {steps} pas >= {gds.sizes['time']} éch.")
             
             result[gname] = gds
             logger.info(f"   ✓ Groupe '{gname}': {len(gds.data_vars)} variables")
@@ -848,6 +1065,7 @@ class ZarrWriter:
         """Écrit un groupe Zarr unique."""
         ds  = self._harmonize_coords(ds)
         ds  = self._clean(ds)
+        ds  = self._clean_time(ds)
         ds  = self._rechunk(ds)
 
         if HAS_RIO:
@@ -918,6 +1136,49 @@ class ZarrWriter:
         return ds
 
     @staticmethod
+    def _clean_time(ds: xr.Dataset) -> xr.Dataset:
+        """Force un temps propre sans pollution cfgrib/CF en le reconstruisant à partir de zéro."""
+        if "time" in ds.coords:
+            try:
+                import pandas as pd
+                # 1. On extrait les valeurs brutes et on les convertit en datetime64[ns] propre
+                # Si GRIB decode_times=False, on a des int. Si decode_times=True, on a des datetime.
+                # pd.to_datetime gère les deux si on l'aide un peu.
+                raw_vals = ds.time.values
+                if raw_vals.dtype.kind in ('i', 'f'):
+                    # Cas numérique (decode_times=False) : on suppose que c'est des heures (GRIB standard)
+                    # ou on tente de lire l'unité pour être sûr.
+                    # Mais le plus simple pour GRIB arpege/arome est d'utiliser le valid_time si présent
+                    # Sinon on fait au mieux.
+                    clean_times = pd.to_datetime(raw_vals, unit='h', origin='1970-01-01')
+                else:
+                    clean_times = pd.to_datetime(raw_vals)
+                
+                # 2. On remplace la coordonnée par une version "float hours since ref"
+                # C'est le format le plus stable pour Zarr/NetCDF
+                ref = pd.Timestamp("1970-01-01")
+                hours_since = (clean_times - ref).total_seconds() / 3600.0
+                
+                # On réassigne comme vecteur float64
+                ds = ds.assign_coords(time=np.array(hours_since, dtype='float64'))
+                
+                # 3. On WIPE tout l'encodage et les attrs pour repartir sur du propre
+                ds.time.encoding = {
+                    "units": "hours since 1970-01-01 00:00:00",
+                    "calendar": "proleptic_gregorian",
+                    "dtype": "float64"
+                }
+                ds.time.attrs = {
+                    "units": "hours since 1970-01-01 00:00:00",
+                    "standard_name": "time",
+                    "long_name": "time",
+                    "axis": "T"
+                }
+            except Exception as e:
+                logger.debug(f"  ⚠ Impossible de nettoyer le temps: {e}")
+        return ds
+
+    @staticmethod
     def _harmonize_coords(ds: xr.Dataset) -> xr.Dataset:
         """Normalise les noms de coordonnées → latitude/longitude."""
         rn = {}
@@ -934,11 +1195,7 @@ class ZarrWriter:
         enc = {}
         for v in ds.data_vars:
             enc[v] = {"compressor": COMPRESSOR, "dtype": "float32"}
-        if "time" in ds.coords:
-            enc["time"] = {
-                "units":    "hours since 1970-01-01",
-                "calendar": "proleptic_gregorian",
-            }
+        # Le temps est déjà géré par _clean_time via ds.time.encoding
         return enc
 
 

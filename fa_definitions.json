@@ -162,19 +162,19 @@
             "desc": "V-component of wind"
         },
         "CLSVENT.ZONAL": {
-            "shortname": "10u",
+            "shortname": "u10",
             "unit": "m s-1",
             "formula": "None",
             "desc": "10m U-component of wind"
         },
         "CLSVENT.MERIDIE": {
-            "shortname": "10v",
+            "shortname": "v10",
             "unit": "m s-1",
             "formula": "None",
             "desc": "10m V-component of wind"
         },
         "CLSVENT.MERIDIEN": {
-            "shortname": "10v",
+            "shortname": "v10",
             "unit": "m s-1",
             "formula": "None",
             "desc": "10m V-component of wind"
@@ -306,19 +306,19 @@
             "desc": "Surface Temperature (Skin)"
         },
         "CLSTEMPERATURE": {
-            "shortname": "2t",
+            "shortname": "t2",
             "unit": "Celsius",
             "formula": "k2c",
             "desc": "2m Temperature"
         },
         "CLSHUMI.RELATIVE": {
-            "shortname": "2r",
+            "shortname": "r2",
             "unit": "%",
             "formula": "percent",
             "desc": "2m Relative Humidity"
         },
         "CLSHUMI.SPECIFIQ": {
-            "shortname": "2q",
+            "shortname": "q2",
             "unit": "kg kg-1",
             "formula": "None",
             "desc": "2m Specific Humidity"
@@ -464,26 +464,26 @@
             }
         },
         "ws10": {
-            "shortname": "10ws",
+            "shortname": "ws10",
             "unit": "m s-1",
             "desc": "10m Wind Speed",
             "recipe": {
                 "type": "vector_magnitude",
                 "sources": [
-                    "10u",
-                    "10v"
+                    "u10",
+                    "v10"
                 ]
             }
         },
         "wdir10": {
-            "shortname": "10wdir",
+            "shortname": "wdir10",
             "unit": "degrees",
             "desc": "10m Wind Direction",
             "recipe": {
                 "type": "vector_direction",
                 "sources": [
-                    "10u",
-                    "10v"
+                    "u10",
+                    "v10"
                 ]
             }
         },

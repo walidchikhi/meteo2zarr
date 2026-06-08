@@ -156,12 +156,40 @@
             "grib1_param": "61",
             "grib2_key": "0.1.52"
         },
+        "twatp": {
+            "shortname": "tp",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Total Precipitation (Water)",
+            "grib2_key": "0.1.52"
+        },
         "sf": {
             "shortname": "tsnowp",
             "unit": "kg m-2",
             "formula": "acc",
             "desc": "Snowfall",
             "grib2_key": "0.1.53"
+        },
+        "tsnowp": {
+            "shortname": "tsnowp",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Total Snowfall (Water)",
+            "grib2_key": "0.1.53"
+        },
+        "snol": {
+            "shortname": "tsnowp_gec",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Large Scale Snowfall",
+            "grib2_key": "0.1.56"
+        },
+        "snoc": {
+            "shortname": "tsnowp_con",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Convective Snowfall",
+            "grib2_key": "0.1.55"
         },
         "lsp": {
             "shortname": "twatp_gec",
@@ -174,6 +202,20 @@
             "unit": "kg m-2",
             "formula": "acc",
             "desc": "Convective Precipitation"
+        },
+        "lswp": {
+            "shortname": "twatp_gec",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Large Scale Water Precipitation",
+            "grib2_key": "0.1.47"
+        },
+        "cwp": {
+            "shortname": "twatp_con",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Convective Water Precipitation",
+            "grib2_key": "0.1.48"
         },
         "cape": {
             "shortname": "cape",
@@ -203,9 +245,9 @@
             "grib2_key": "2.0.0"
         },
         "snom": {
-            "shortname": "snom",
+            "shortname": "tsnowp",
             "unit": "m",
-            "formula": "None",
+            "formula": "acc",
             "desc": "Snow Depth"
         },
         "vis": {
@@ -213,6 +255,13 @@
             "unit": "m",
             "formula": "None",
             "desc": "Visibility"
+        },
+	"ptype": {
+            "shortname": "ptype",
+            "unit": "",
+            "formula": "None",
+            "desc": "Precipitation type",
+            "grib2_key": "0.1.19"
         },
         "gust": {
             "shortname": "gust",
@@ -277,8 +326,13 @@
         "0.0.3": "papt",
         "0.1.0": "q",
         "0.1.1": "r",
+	"0.1.47": "lswp",
+	"0.1.48": "cwp",
         "0.1.52": "tp",
         "0.1.53": "sf",
+        "0.1.55": "snoc",
+        "0.1.56": "snol",
+	"0.1.50": "tsnowp",
         "0.2.2": "u",
         "0.2.3": "v",
         "0.2.8": "w",

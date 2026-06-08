@@ -1,0 +1,52 @@
+usage: slurm_launcher.py single_job [-h] --model MODEL --run RUN --input INPUT
+                                    --output OUTPUT
+                                    [--fmt {fa,lfa,grib,grib1,grib2,netcdf}]
+                                    [--dt-hours DT_HOURS] [--account ACCOUNT]
+                                    [--qos QOS] [--partition PARTITION]
+                                    [--venv VENV] [--conda-env CONDA_ENV]
+                                    [--modules MODULES [MODULES ...]]
+                                    [--python PYTHON]
+                                    [--dask-workers DASK_WORKERS]
+                                    [--read-threads READ_THREADS]
+                                    [--write-threads WRITE_THREADS]
+                                    [--chunk-time CHUNK_TIME] [--pyramids]
+                                    [--dashboard-port DASHBOARD_PORT]
+                                    [--dashboard-address DASHBOARD_ADDRESS]
+                                    [--dry-run] [--wait] [--log-dir LOG_DIR]
+
+options:
+  -h, --help            show this help message and exit
+  --model MODEL
+  --run RUN             YYYYMMDDHH
+  --input INPUT
+  --output OUTPUT
+  --fmt {fa,lfa,grib,grib1,grib2,netcdf}
+  --dt-hours DT_HOURS
+  --account ACCOUNT
+  --qos QOS
+  --partition PARTITION
+  --venv VENV           Chemin vers le venv Python (source venv/bin/activate)
+  --conda-env CONDA_ENV, --conda CONDA_ENV
+                        Nom de l'environnement Conda (conda activate)
+  --modules MODULES [MODULES ...]
+                        Modules HPC à charger (module load)
+  --python PYTHON       Version Python à utiliser, ex: 3.12 ou python3.12
+                        (défaut: python3)
+  --dask-workers DASK_WORKERS
+  --read-threads READ_THREADS
+                        Overfide read_threads
+  --write-threads WRITE_THREADS
+                        Override write_threads
+  --chunk-time CHUNK_TIME
+  --pyramids
+  --dashboard-port DASHBOARD_PORT
+  --dashboard-address DASHBOARD_ADDRESS
+  --dry-run
+  --wait
+  --log-dir LOG_DIR
+python3 slurm_launcher.py single_job --model arome --run 2026051300 --input --output zarr --fmt grib --venv
+python3 slurm_launcher.py single_job -h
+
+python3 slurm_launcher.py single_job --model arome --run 2026051700 --input /fennecData/home/pnt/output/AROME/cy46/pre_oper/GRIB/17052026  --output zarr/arome --fmt grib2  --conda-env nour
+python3 slurm_launcher.py single_job --model aladin --run 2026051700 --input /fennecData/home/pnt/output/ALADIN/cy46/pre_oper/GRIB/17052026  --output zarr/aladin --fmt grib2  --conda-env nour
+python3 slurm_launcher.py single_job --model arpege  --run 2026051700 --input /fennecData/home/pnt/metview/ARPEGE/get_ARPEGE/17052026/all --output zarr/arpege --fmt grib2  --conda-env nour
