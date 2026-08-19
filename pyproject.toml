@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meteo2zarr"
-version = "0.1.0"
+version = "1.0.0"
 description = "High-performance Numerical Weather Prediction (NWP) to Zarr conversion and cartographic analysis engine."
 readme = "README.md"
 license = { text = "Apache-2.0" }
