@@ -175,13 +175,12 @@ class MeteoZarr:
         savefig: Optional[Union[str, Path]] = None,
         use_cartopy: bool = True,
         figsize: tuple = (10, 7),
-        dpi: int = 200,
+        dpi: int = 150,
     ) -> Any:
-        """Rich cartographic and meteorological plotter inspired by epy_cartoplot."""
+        """Fast and rich cartographic plotter."""
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
 
-        # Determine if scalar or vector wind plot
         is_wind_vector = (wu is not None and wv is not None)
         if not field and not is_wind_vector:
             raise ValueError("Either `field` or both `wu` and `wv` must be provided.")
@@ -234,8 +233,9 @@ class MeteoZarr:
             if zoom_extent:
                 ax.set_extent(zoom_extent, crs=ccrs.PlateCarree())
 
-            ax.coastlines(resolution="10m", color="black", linewidth=0.8)
-            ax.add_feature(cfeature.BORDERS, linestyle=":", edgecolor="black")
+            # Use 50m resolution for instant responsiveness (10m requires downloading heavy NaturalEarth shapefiles)
+            ax.coastlines(resolution="50m", color="black", linewidth=0.8)
+            ax.add_feature(cfeature.BORDERS.with_scale("50m"), linestyle=":", edgecolor="black")
             gl = ax.gridlines(draw_labels=True, linestyle="--", alpha=0.5)
             gl.top_labels = False
             gl.right_labels = False
@@ -250,7 +250,6 @@ class MeteoZarr:
             ax.grid(True, linestyle="--", alpha=0.5)
             transform = None
 
-        # Norm / centering
         norm = None
         if center_cmap_on_0:
             if da_scalar is not None:
@@ -291,7 +290,6 @@ class MeteoZarr:
             sub_v = v_val[::step, ::step] if v_val.ndim == 2 else v_val
 
             if not field:
-                # Plot background speed
                 kw_bg = {"cmap": colormap, "shading": "auto"}
                 if transform:
                     kw_bg["transform"] = transform
