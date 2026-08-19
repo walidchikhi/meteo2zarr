@@ -115,6 +115,11 @@ class MeteoZarr:
 
             info_lines.append(f"\nGroup: '{gname}' ({len(var_names)} variables, {len(times)} timesteps)")
             info_lines.append(f"  Time range  : {t_start} -> {t_end}")
+            if (details in ("time", "times") or verbose) and times:
+                if len(times) <= 15:
+                    info_lines.append(f"  Timesteps ({len(times)}) : " + ", ".join(times))
+                else:
+                    info_lines.append(f"  Timesteps ({len(times)}) : " + ", ".join(times[:6]) + " ... " + ", ".join(times[-4:]))
             info_lines.append(f"  Grid size   : {lat_len} latitudes x {lon_len} longitudes")
             
             if details == "grid" and lat_name and lon_name:

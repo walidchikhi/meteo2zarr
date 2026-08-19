@@ -11,6 +11,9 @@ meteo2zarr what output_zarr/aladin_2026081900
 # Print directly to stdout without writing a file (-o / --stdout)
 meteo2zarr what output_zarr/aladin_2026081900 -o
 
+# Display the exact list of available timesteps (-d time)
+meteo2zarr what output_zarr/aladin_2026081900 -d time -o
+
 # Sort variables alphabetically (-s / --sortfields)
 meteo2zarr what output_zarr/aladin_2026081900 -s -o
 
@@ -36,35 +39,34 @@ store = m2z.open("output_zarr/aladin_2026081900")
 # Write report file: ./aladin_2026081900.info
 store.what()
 
-# Print to stdout
-report_text = store.what(stdout=True, details="grid", sortfields=True)
+# Print to stdout with full list of timesteps
+store.what(stdout=True, details="time")
 ```
 
 ---
 
-## Sample Inspection Output
+## Sample Inspection Output with Timesteps (`-d time`)
 
 ```text
 ========================================================================
 METEO2ZARR INSPECTION: aladin_2026081900
 ========================================================================
 
-Group: 'surface' (12 variables, 73 timesteps)
-  Time range  : 2026-08-19T00:00:00 -> 2026-08-22T00:00:00
-  Grid size   : 350 latitudes x 350 longitudes
-  Lat bounds  : [22.0000 .. 42.0000] (step ~ 0.0573)
-  Lon bounds  : [-9.0000 .. 15.0000] (step ~ 0.0688)
-  Variables   :
-    - 2t               : 2m Temperature [Celsius] (type: surface, level: 2.0)
-    - 10u              : 10m U-Wind [m s-1] (type: surface, level: 10.0)
-    - 10v              : 10m V-Wind [m s-1] (type: surface, level: 10.0)
-    - ps               : Surface Pressure [hPa] (type: surface, level: 0.0)
-    - totcc            : Total Cloud Cover [%] (type: surface, level: 0.0)
+Group: 'surface' (3 variables, 10 timesteps)
+  Time range     : 2026-08-19T00:00:00 -> 2026-08-19T09:00:00
+  Timesteps (10) : 2026-08-19T00:00:00, 2026-08-19T01:00:00, 2026-08-19T02:00:00, 2026-08-19T03:00:00, 2026-08-19T04:00:00, 2026-08-19T05:00:00, 2026-08-19T06:00:00, 2026-08-19T07:00:00, 2026-08-19T08:00:00, 2026-08-19T09:00:00
+  Grid size      : 350 latitudes x 350 longitudes
+  Variables      :
+    - t2               : 2m Temperature [Celsius] (type: surface)
+    - twatp_con        : Convective Precip [kg m-2] (type: surface)
+    - twatp_gec        : Large Scale Precip [kg m-2] (type: surface)
 
-Group: 'surface_3h' (3 variables, 70 timesteps)
-  Time range  : 2026-08-19T03:00:00 -> 2026-08-22T00:00:00
-  Grid size   : 350 latitudes x 350 longitudes
-  Variables   :
-    - tp_3h            : 3h Accumulated Precipitation [kg m-2] (type: surface)
+Group: 'surface_3h' (2 variables, 7 timesteps)
+  Time range     : 2026-08-19T03:00:00 -> 2026-08-19T09:00:00
+  Timesteps (7)  : 2026-08-19T03:00:00, 2026-08-19T04:00:00, 2026-08-19T05:00:00, 2026-08-19T06:00:00, 2026-08-19T07:00:00, 2026-08-19T08:00:00, 2026-08-19T09:00:00
+  Grid size      : 350 latitudes x 350 longitudes
+  Variables      :
+    - twatp_con_3h     : 3h Accumulated Precipitation [kg m-2] (type: surface)
+    - twatp_gec_3h     : 3h Accumulated Precipitation [kg m-2] (type: surface)
 ========================================================================
 ```
