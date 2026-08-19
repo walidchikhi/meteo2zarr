@@ -125,7 +125,7 @@ Regardless of input format:
 - Group: `surface`
 - Array Name: `2t`
 - Attributes: `{"long_name": "2m Temperature", "units": "Celsius", "level_type": "surface", "level": 2.0}`
-- Values: Converted from Kelvin to Celsius via $T_{°C} = T_K - 273.15$.
+- Values: Converted from Kelvin to Celsius via formula `T_celsius = T_kelvin - 273.15`.
 
 ---
 
@@ -134,11 +134,17 @@ Regardless of input format:
 A common question is: **Where does `RR3h` come from, what does it contain, and where is it declared?**
 
 ### 1. The Physical Need for Decumulations
-In NWP models (AROME, ALADIN), precipitation fields (`SURFACCPLUIE`, `SURFPREC.EAU.CON`, `tp`) are cumulative quantities integrated since run inception ($t=0$):
-$$\text{Accumulated}(T) = \int_0^T P(t) \, dt$$
+In NWP models (AROME, ALADIN), precipitation fields (`SURFACCPLUIE`, `SURFPREC.EAU.CON`, `tp`) are cumulative quantities integrated since run inception (`t = 0`):
+
+```text
+Accumulated_Rain(T) = Total precipitation from step 0 to step T
+```
 
 Meteorologists need decumulated rainfall over specific sliding intervals, for instance the last 3 hours:
-$$\text{Rain}_{3\text{h}}(T) = \text{Accumulated}(T) - \text{Accumulated}(T - 3\text{h})$$
+
+```text
+Rain_3h(T) = Accumulated_Rain(T) - Accumulated_Rain(T - 3h)
+```
 
 ### 2. Where are the accumulation rules declared?
 In `fa_definitions.json` and `grib_definitions.json` under the `"accumulations"` block:
@@ -186,11 +192,11 @@ The formulas are defined in `src/meteo2zarr/processing/derived.py` within `apply
 
 | Formula Key | Operation | Usage |
 | :--- | :--- | :--- |
-| `k2c` | $X - 273.15$ | Kelvin to Celsius |
-| `pa2hpa` | $X / 100.0$ | Pascals to Hectopascals |
-| `div98` | $X / 9.80665$ | Geopotential to Geopotential Height ($gpm$) |
-| `percent` | $X \times 100.0$ | Fraction $[0, 1]$ to Percentage $[0, 100\%]$ |
-| `none` / `None` | $X$ | Direct physical values |
+| `k2c` | `X - 273.15` | Kelvin to Celsius |
+| `pa2hpa` | `X / 100.0` | Pascals to Hectopascals |
+| `div98` | `X / 9.80665` | Geopotential to Geopotential Height (gpm) |
+| `percent` | `X * 100.0` | Fraction [0, 1] to Percentage [0, 100%] |
+| `none` / `None` | `X` | Direct physical values |
 
 ---
 
