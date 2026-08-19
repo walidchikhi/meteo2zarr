@@ -344,6 +344,12 @@ class MeteoZarr:
             fig, ax = plt.subplots(figsize=figsize, subplot_kw={"projection": ccrs.PlateCarree()})
             if zoom_extent:
                 ax.set_extent(zoom_extent, crs=ccrs.PlateCarree())
+            else:
+                lon_min, lon_max = float(np.nanmin(lons)), float(np.nanmax(lons))
+                lat_min, lat_max = float(np.nanmin(lats)), float(np.nanmax(lats))
+                # Only auto-extent for regional domains (not global)
+                if abs(lon_max - lon_min) < 350:
+                    ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
             ax.coastlines(resolution="50m", color="black", linewidth=0.8)
             ax.add_feature(cfeature.BORDERS.with_scale("50m"), linestyle=":", edgecolor="black")
