@@ -366,9 +366,7 @@ class MeteoZarr:
                     pass
 
             try:
-                gl = ax.gridlines(draw_labels=True, linestyle="--", alpha=0.5)
-                gl.top_labels = False
-                gl.right_labels = False
+                gl = ax.gridlines(draw_labels=False, linestyle="--", alpha=0.5)
             except Exception:
                 pass
             transform = ccrs.PlateCarree()
