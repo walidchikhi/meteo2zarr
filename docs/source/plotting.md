@@ -1,42 +1,42 @@
 # Cartographic Plotting
 
-`meteo2zarr` includes a high-performance cartographic rendering engine built on top of Matplotlib and Cartopy, optimized to render maps in less than 2 seconds using pre-cached local NaturalEarth geometries.
+`meteo2zarr` includes a high-performance cartographic rendering engine built on top of Matplotlib and Cartopy, optimized to render publication-ready maps in less than 2 seconds using pre-cached local NaturalEarth geometries and automatic domain bounding.
 
 ---
 
-## 1. Gallery of Generated Products
+## 1. Gallery of Generated Products (ALADIN Full Domain)
 
-Here are sample figures generated directly from real AROME and ALADIN model outputs converted with `meteo2zarr`:
+Here are sample figures generated directly from real ALADIN operational model outputs converted with `meteo2zarr`:
 
-### Temperature Field with Shaded Contours
+### 2m Temperature Field (Shaded Contours + Turbo Colormap)
 ```python
 store.plot('t2', timestep=3, plot_method='contourf', colormap='turbo', savefig=True)
 ```
-!['2m Temperature Forecast'](_static/images/sample_t2_contourf.png)
+!['ALADIN 2m Temperature Forecast (contourf)'](_static/images/aladin_t2_contourf.png)
 
 ---
 
-### Decumulated 3h Precipitation
+### Decumulated 3-Hour Convective Precipitation
 ```python
-store.plot('twatp_con_3h', timestep=3, group='surface_3h', plot_method='contourf', colormap='YlGnBu', savefig=True)
+store.plot('twatp_con_3h', timestep=0, group='surface_3h', plot_method='contourf', colormap='YlGnBu', savefig=True)
 ```
-!['3h Decumulated Precipitation Forecast'](_static/images/sample_precip_3h.png)
+!['ALADIN 3h Decumulated Convective Rain'](_static/images/aladin_precip_3h.png)
 
 ---
 
-### Wind Vectors (Meteorological Barbs)
+### Decumulated 6-Hour Large-Scale Precipitation
 ```python
-store.plot(wu='10u', wv='10v', timestep=3, vector_plot_method='barbs', vectors_subsampling=15, savefig=True)
+store.plot('twatp_gec_6h', timestep=0, group='surface_6h', plot_method='contourf', colormap='Blues', savefig=True)
 ```
-!['10m Wind Barbs'](_static/images/sample_wind_barbs.png)
+!['ALADIN 6h Decumulated Large Scale Rain'](_static/images/aladin_precip_6h.png)
 
 ---
 
-### Streamlines over Temperature
+### 2m Temperature Field (Fast Pcolormesh + Spectral_r)
 ```python
-store.plot(field='2t', wu='10u', wv='10v', timestep=3, vector_plot_method='streamplot', plot_method='pcolormesh', savefig=True)
+store.plot('t2', timestep=0, plot_method='pcolormesh', colormap='Spectral_r', savefig=True)
 ```
-!['Streamlines over Temperature'](_static/images/sample_temp_streamlines.png)
+!['ALADIN 2m Temperature (pcolormesh)'](_static/images/aladin_t2_pcolormesh.png)
 
 ---
 
@@ -44,9 +44,9 @@ store.plot(field='2t', wu='10u', wv='10v', timestep=3, vector_plot_method='strea
 
 When saving with `-O` or `savefig=True`, filenames and titles follow clean, structured conventions:
 
-- **Filename format**: `<store>_<subgroup>_<param>_<date>_<timestep>.png`  
-  *Example*: `aladin_2026081900_surface_2t_2026081903_t03.png`
-- **Title format (2-line layout)**:  
+- Filename format: `<store>_<subgroup>_<param>_<date>_<timestep>.png`  
+  *Example*: `aladin_2026081900_surface_t2_2026081903_t03.png`
+- Title format (2-line layout):
   ```text
   Store: <store> | Group: <group>
   Param: <param_description> [<unit>] | Validity: <datetime> (+<step>h)
@@ -58,20 +58,17 @@ When saving with `-O` or `savefig=True`, filenames and titles follow clean, stru
 
 ```bash
 # Plot with automatic naming and 2-line header
-meteo2zarr plot output_zarr/aladin_2026081900 -f 2t --timestep 3 -O
+meteo2zarr plot output_zarr/aladin_2026081900 -f t2 --timestep 3 -O
 
 # Shaded contour plot (contourf) with custom colormap
-meteo2zarr plot output_zarr/aladin_2026081900 -f 2t --pm contourf -c turbo -O
+meteo2zarr plot output_zarr/aladin_2026081900 -f t2 --pm contourf -c turbo -O
 
 # Centering colormap on 0 (ideal for anomalies or Celsius temperature around 0°C)
-meteo2zarr plot output_zarr/aladin_2026081900 -f 2t -t -O
+meteo2zarr plot output_zarr/aladin_2026081900 -f t2 -t -O
 
 # Clamped range min/max
-meteo2zarr plot output_zarr/aladin_2026081900 -f 2t -m "0,45" -O
+meteo2zarr plot output_zarr/aladin_2026081900 -f t2 -m "0,45" -O
 
-# Wind barbs
-meteo2zarr plot output_zarr/aladin_2026081900 --wU 10u --wV 10v --vpm barbs -s 15 -O
-
-# Geographic zoom
-meteo2zarr plot output_zarr/aladin_2026081900 -f 2t --zoom "lonmin=-2, lonmax=12, latmin=30, latmax=40" -O
+# Geographic zoom onto custom bounding box
+meteo2zarr plot output_zarr/aladin_2026081900 -f t2 --zoom "lonmin=-2, lonmax=12, latmin=30, latmax=40" -O
 ```
