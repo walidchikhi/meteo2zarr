@@ -23,6 +23,7 @@ source_suffix = {
 }
 
 master_doc = "index"
+root_doc = "index"
 
 html_theme = "sphinx_rtd_theme"
 html_theme_options = {
