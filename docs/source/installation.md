@@ -2,11 +2,11 @@
 
 ## Requirements
 
-- **Python**: `>= 3.9` (recommended `3.10` or `3.11`)
-- **Core Dependencies**: `xarray`, `zarr`, `dask`, `distributed`, `numpy`, `pandas`, `pyyaml`, `numcodecs`, `matplotlib`, `cartopy`
-- **Optional NWP Engines**:
+- Python: >= 3.9 (recommended 3.10 or 3.11)
+- Core Dependencies: `xarray`, `zarr`, `dask`, `distributed`, `numpy`, `pandas`, `pyyaml`, `numcodecs`, `matplotlib`, `cartopy`
+- Optional NWP Engines:
   - `epygram` (for FA / LFA format decoding)
-  - `eccodes` / `cfgrib` (for GRIB1 / GRIB2 format decoding)
+  - `eccodes` (for GRIB1 / GRIB2 format decoding)
 
 ## Basic Installation via Pip
 
@@ -16,11 +16,11 @@ pip install meteo2zarr
 
 ## Installation with Full NWP Backends (Conda / Mamba recommended)
 
-Because meteorological binaries (`libeccodes`, `gdal`, `geos`) require C libraries:
+Because meteorological C-libraries (`libeccodes`, `gdal`, `geos`) are required for direct binary decoding:
 
 ```bash
 # Create dedicated conda environment
-conda create -n meteo2zarr -c conda-forge python=3.10 eccodes cfgrib cartopy epygram
+conda create -n meteo2zarr -c conda-forge python=3.10 eccodes cartopy epygram
 conda activate meteo2zarr
 
 # Install meteo2zarr in editable mode or from PyPI
