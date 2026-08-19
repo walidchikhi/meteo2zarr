@@ -126,7 +126,7 @@ def main() -> None:
             vectors_subsampling=args.vectors_subsampling,
             title=args.title,
             savefig=args.savefig,
-            dpi=args.figures_dpi,
+            dpi=args.fd,
         )
 
 
