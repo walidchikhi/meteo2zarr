@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from meteo2zarr.core.converter import NWPConverter
-from meteo2zarr.core.store import open_zarr
+from meteo2zarr.core.store import open as open_store
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,6 +44,7 @@ def main() -> None:
     # 2. What (inspect) subcommand
     what_parser = subparsers.add_parser("what", help="Inspect contents of a Zarr dataset")
     what_parser.add_argument("store", help="Path to .zarr file or multi-group Zarr directory")
+    what_parser.add_argument("--save-info", action="store_true", help="Save the output into a <store_name>.info file")
 
     # 3. Plot subcommand
     plot_parser = subparsers.add_parser("plot", help="Plot a 2D variable from a Zarr store")
@@ -85,11 +86,11 @@ def main() -> None:
         sys.exit(0 if ok else 1)
 
     elif args.command == "what":
-        store = open_zarr(args.store)
-        store.what()
+        store = open_store(args.store)
+        store.what(write_info=args.save_info, verbose=True)
 
     elif args.command == "plot":
-        store = open_zarr(args.store)
+        store = open_store(args.store)
         store.plot(
             var_name=args.var,
             timestep=args.timestep,

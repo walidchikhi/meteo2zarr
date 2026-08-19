@@ -42,10 +42,10 @@ def main():
     )
 
     if success:
-        print("\n✅ Conversion completed successfully!")
+        print("Conversion completed successfully!")
         print(f"Zarr store created at: {Path(output_dir) / f'{model_name}_{run_date.strftime(\"%Y%m%d%H\")}.zarr'}")
     else:
-        print("\n❌ Conversion failed. Check logs for details.")
+        print("Conversion failed. Check logs for details.")
 
 if __name__ == "__main__":
     main()

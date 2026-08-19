@@ -1,5 +1,6 @@
 """Interactive Reader, Inspector, and Plotter for Zarr Meteorological Datasets."""
 
+import builtins
 import io
 import logging
 from pathlib import Path
@@ -35,10 +36,11 @@ class MeteoZarr:
                 grp_name = zf.stem
                 self.groups[grp_name] = xr.open_zarr(str(zf), consolidated=True)
 
-    def what(self, write_info: bool = True, verbose: bool = True) -> Dict[str, Any]:
+    def what(self, write_info: bool = False, verbose: bool = True) -> Dict[str, Any]:
         """Inspect dataset structure, groups, variables, levels, and times.
         
-        Writes summary into `<zarr_name>.info` file alongside the Zarr store.
+        By default prints information without creating any file.
+        Set write_info=True to save output into <store_name>.info.
         """
         summary = {}
         info_lines = []
@@ -83,14 +85,14 @@ class MeteoZarr:
         info_lines.append("\n" + sep)
         report_text = "\n".join(info_lines)
 
-        # 1. Print to terminal if verbose
+        # 1. Print to terminal
         if verbose:
             print(report_text)
 
-        # 2. Write <store_name>.info file
+        # 2. Write <store_name>.info file only if explicitly requested
         if write_info:
             info_file_path = self.path.parent / f"{self.path.name}.info"
-            with open(info_file_path, "w", encoding="utf-8") as f:
+            with builtins.open(info_file_path, "w", encoding="utf-8") as f:
                 f.write(report_text + "\n")
             if verbose:
                 print(f"[OK] Info written to: {info_file_path}")
@@ -209,6 +211,10 @@ class MeteoZarr:
         return fig, ax
 
 
-def open_zarr(path: Union[str, Path]) -> MeteoZarr:
-    """Convenience factory function to open a meteo2zarr store."""
+def open(path: Union[str, Path]) -> MeteoZarr:
+    """Open a meteo2zarr dataset store."""
     return MeteoZarr(path)
+
+
+# Alias
+open_zarr = open
