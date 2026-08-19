@@ -252,13 +252,12 @@ class MeteoZarr:
         time_dim = "time" if "time" in da.coords else ("valid_time" if "valid_time" in da.coords else None)
         val_time = str(da[time_dim].values)[:19] if time_dim else "Static"
 
-        title_parts = [f"Store: {store_base}"]
+        line1_parts = [f"Store: {store_base}"]
         if group and group != self.path.stem:
-            title_parts.append(f"Group: {group}")
-        title_parts.append(f"Param: {param_desc}")
-        title_parts.append(f"Validity: {val_time} (+{timestep}h)")
-
-        return " | ".join(title_parts)
+            line1_parts.append(f"Group: {group}")
+        line1 = " | ".join(line1_parts)
+        line2 = f"Param: {param_desc} | Validity: {val_time} (+{timestep:02d}h)"
+        return line1 + chr(10) + line2
 
     def plot(
         self,
