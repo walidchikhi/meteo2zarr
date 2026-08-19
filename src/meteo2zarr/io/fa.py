@@ -169,7 +169,7 @@ class FAReader(BaseNWPReader):
         total_files = len(files)
         workers_count = min(total_files, n_threads)
 
-        print(f"\n📂 [1/4] Reading {total_files} FA files in parallel ({workers_count} processes)...")
+        print(f"\n[1/4] Reading {total_files} FA files in parallel ({workers_count} processes)...")
         
         completed_count = 0
         with ProcessPoolExecutor(max_workers=workers_count) as pool:
@@ -184,24 +184,23 @@ class FAReader(BaseNWPReader):
                 except Exception as e:
                     logger.warning("Worker failure on %s: %s", fp.name, e)
 
-                # Render live progress bar in terminal
                 pct = int((completed_count / total_files) * 100)
                 bar_len = 30
                 filled = int((completed_count / total_files) * bar_len)
-                bar = "█" * filled + "░" * (bar_len - filled)
+                bar = "#" * filled + "-" * (bar_len - filled)
                 elapsed = time.perf_counter() - t0
-                print(f"\r   [{bar}] {completed_count}/{total_files} files ({pct}%) - {elapsed:.1f}s | Reading: {fp.name}", end="", flush=True)
+                print(f"\r   [{bar}] {completed_count}/{total_files} files ({pct}%) - {elapsed:.1f}s | {fp.name}", end="", flush=True)
 
-        print(f"\n   ✅ All {total_files} files read successfully in {time.perf_counter() - t0:.2f}s!")
+        print(f"\n   [OK] All {total_files} files read in {time.perf_counter() - t0:.2f}s")
         if not results:
             return None
 
-        print("🔄 [2/4] Merging forecast timesteps into multi-dimensional dataset...")
+        print("[2/4] Merging forecast timesteps into multi-dimensional dataset...")
         datasets = [results[fp] for fp in sorted(results.keys())]
 
         merged = xr.concat(datasets, dim="time", data_vars="all", compat="override", coords="minimal")
         merged = merged.sortby("time")
         _, idx = np.unique(merged.time.values, return_index=True)
         ds_final = merged.isel(time=idx)
-        print(f"   ✅ Unified dataset created: {len(ds_final.time)} timesteps, {len(ds_final.data_vars)} variables.")
+        print(f"   [OK] Unified dataset created: {len(ds_final.time)} timesteps, {len(ds_final.data_vars)} variables")
         return ds_final

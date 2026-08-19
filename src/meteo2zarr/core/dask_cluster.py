@@ -55,11 +55,10 @@ class DaskClusterManager:
         )
         self.client = Client(self.cluster)
 
-        # Print accessible URL with real machine IP
         host_ip = _get_host_ip()
         dash_port = self.cluster.dashboard_link.split(":")[-1].split("/")[0]
         logger.info("=" * 60)
-        logger.info("📊 DASK DASHBOARD ACTIVE AT:")
+        logger.info("DASK DASHBOARD ACTIVE AT:")
         logger.info("   Local URL  : http://localhost:%s/status", dash_port)
         logger.info("   Network URL: http://%s:%s/status", host_ip, dash_port)
         logger.info("=" * 60)

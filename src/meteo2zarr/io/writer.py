@@ -104,18 +104,18 @@ class ZarrWriter:
         t0 = time.perf_counter()
         total_groups = len(group_datasets)
 
-        print(f"\n💾 [4/4] Writing {total_groups} partitioned Zarr groups to disk...")
+        print(f"\n[4/4] Writing {total_groups} partitioned Zarr groups to disk...")
         
         idx = 0
         for gname, gds in group_datasets.items():
             idx += 1
             t_grp = time.perf_counter()
-            print(f"   [{idx}/{total_groups}] Compressing & writing group: '{gname}' ({len(gds.data_vars)} variables)... ", end="", flush=True)
+            print(f"   [{idx}/{total_groups}] Compressing and writing group: '{gname}' ({len(gds.data_vars)} variables)... ", end="", flush=True)
             self._write_group(gname, gds, run_dir)
             size_mb = sum(f.stat().st_size for f in (run_dir / f"{gname}.zarr").rglob("*") if f.is_file()) / 1e6
             print(f"Done in {time.perf_counter() - t_grp:.1f}s ({size_mb:.1f} MB)")
 
-        print(f"   ✅ All Zarr stores written in {time.perf_counter() - t0:.2f}s!")
+        print(f"   [OK] All Zarr stores written in {time.perf_counter() - t0:.2f}s")
 
     def _write_group(self, group_name: str, ds: xr.Dataset, run_dir: Path) -> None:
         output_path = run_dir / f"{group_name}.zarr"

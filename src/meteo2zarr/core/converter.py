@@ -61,31 +61,31 @@ class NWPConverter:
         """Run complete conversion workflow for a given model run."""
         input_path = Path(input_dir)
         if not input_path.exists():
-            print(f"❌ Input directory does not exist: {input_path}")
+            print(f"[ERROR] Input directory does not exist: {input_path}")
             return False
 
         detected_fmt, files = list_and_classify_files(input_path, explicit_fmt=fmt)
         if not files:
-            print(f"❌ No valid data files found in directory: {input_path}")
+            print(f"[ERROR] No valid data files found in directory: {input_path}")
             return False
 
         print("=" * 65)
-        print(f"🚀 METEO2ZARR CONVERSION: {model.upper()} (Run: {run_date.strftime('%Y-%m-%d %H:00 UTC')})")
-        print(f"   Format: {detected_fmt.upper()} | Total Files: {len(files)} | Output: {self.output_dir}")
+        print(f"METEO2ZARR CONVERSION: {model.upper()} (Run: {run_date.strftime('%Y-%m-%d %H:00 UTC')})")
+        print(f"Format: {detected_fmt.upper()} | Total Files: {len(files)} | Output: {self.output_dir}")
         print("=" * 65)
 
         try:
-            # 1. Ingest Dataset with dedicated reader (Includes live progress bar)
+            # 1. Ingest Dataset with dedicated reader
             ds = self._ingest(files, detected_fmt)
             if ds is None or len(ds.data_vars) == 0:
-                print("❌ No variables were ingested.")
+                print("[ERROR] No variables were ingested.")
                 return False
 
             # 2. Apply Meteorological Transformations (Decumulation & Sliding Windows)
-            print("\n🧮 [3/4] Calculating precipitation decumulations & derived fields...")
+            print("\n[3/4] Calculating precipitation decumulations and derived fields...")
             t_tr = time.perf_counter()
             ds = self._apply_transformations(ds, dt_hours)
-            print(f"   ✅ Derived meteorology fields computed in {time.perf_counter() - t_tr:.2f}s")
+            print(f"   [OK] Derived meteorology fields computed in {time.perf_counter() - t_tr:.2f}s")
 
             # 3. Partition into Groups
             grouped = self.partitioner.partition(ds)
@@ -96,12 +96,12 @@ class NWPConverter:
             self.writer.write_all(grouped, run_out_dir)
 
             print("\n" + "=" * 65)
-            print(f"🎉 SUCCESS: All Zarr groups generated in: {run_out_dir}")
+            print(f"SUCCESS: All Zarr groups generated in: {run_out_dir}")
             print("=" * 65 + "\n")
             return True
         except Exception as e:
             logger.exception("Conversion failed: %s", e)
-            print(f"\n❌ Error during conversion: {e}")
+            print(f"\n[ERROR] Conversion failed: {e}")
             return False
 
     def _ingest(self, files: List[Path], fmt: str) -> Optional[xr.Dataset]:
