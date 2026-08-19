@@ -31,7 +31,7 @@ class NWPConverter:
         chunk_time: int = 6,
         write_threads: int = 4,
         read_threads: int = 16,
-        dashboard_address: str = ":8787",
+        dashboard_address: str = "0.0.0.0:8787",
         use_pyramids: bool = False,
     ) -> None:
         self.output_dir = Path(output_dir)
@@ -78,32 +78,40 @@ class NWPConverter:
             len(files),
         )
 
-        try:
-            # 1. Ingest Dataset with dedicated reader
-            ds = self._ingest(files, detected_fmt)
-            if ds is None or len(ds.data_vars) == 0:
-                logger.error("No variables were ingested from %s", input_path)
+        # Start Dask cluster to serve the live dashboard
+        cluster_mgr = DaskClusterManager(
+            n_workers=self.dask_workers,
+            threads_per_worker=self.dask_threads,
+            dashboard_address=self.dashboard_address,
+        )
+
+        with cluster_mgr as client:
+            try:
+                # 1. Ingest Dataset with dedicated reader
+                ds = self._ingest(files, detected_fmt)
+                if ds is None or len(ds.data_vars) == 0:
+                    logger.error("No variables were ingested from %s", input_path)
+                    return False
+
+                # 2. Apply Transformations (Decumulation & Sliding Windows)
+                logger.info("Applying meteorological transformations & accumulation algorithms...")
+                ds = self._apply_transformations(ds, dt_hours)
+
+                # 3. Partition into Groups
+                logger.info("Partitioning variables into hierarchical Zarr groups...")
+                grouped = self.partitioner.partition(ds)
+
+                # 4. Write Grouped Zarr Stores
+                run_str = run_date.strftime("%Y%m%d%H")
+                run_out_dir = self.output_dir / f"{model}_{run_str}"
+                logger.info("Writing Zarr stores into directory: %s", run_out_dir)
+                self.writer.write_all(grouped, run_out_dir)
+
+                logger.info("✅ Conversion completed successfully for %s %s", model, run_date)
+                return True
+            except Exception as e:
+                logger.exception("Conversion failed: %s", e)
                 return False
-
-            # 2. Apply Transformations (Decumulation & Sliding Windows)
-            logger.info("Applying meteorological transformations & accumulation algorithms...")
-            ds = self._apply_transformations(ds, dt_hours)
-
-            # 3. Partition into Groups
-            logger.info("Partitioning variables into hierarchical Zarr groups...")
-            grouped = self.partitioner.partition(ds)
-
-            # 4. Write Grouped Zarr Stores
-            run_str = run_date.strftime("%Y%m%d%H")
-            run_out_dir = self.output_dir / f"{model}_{run_str}"
-            logger.info("Writing Zarr stores into directory: %s", run_out_dir)
-            self.writer.write_all(grouped, run_out_dir)
-
-            logger.info("✅ Conversion completed successfully for %s %s", model, run_date)
-            return True
-        except Exception as e:
-            logger.exception("Conversion failed: %s", e)
-            return False
 
     def _ingest(self, files: List[Path], fmt: str) -> Optional[xr.Dataset]:
         """Ingests raw files based on detected/configured format."""
