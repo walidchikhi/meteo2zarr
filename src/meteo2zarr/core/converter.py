@@ -61,57 +61,48 @@ class NWPConverter:
         """Run complete conversion workflow for a given model run."""
         input_path = Path(input_dir)
         if not input_path.exists():
-            logger.error("Input directory does not exist: %s", input_path)
+            print(f"❌ Input directory does not exist: {input_path}")
             return False
 
-        logger.info("Scanning and identifying files in: %s", input_path)
         detected_fmt, files = list_and_classify_files(input_path, explicit_fmt=fmt)
         if not files:
-            logger.error("No valid data files found in directory: %s", input_path)
+            print(f"❌ No valid data files found in directory: {input_path}")
             return False
 
-        logger.info(
-            "Starting conversion for Model: %s | Run: %s | Format: %s (%d files)",
-            model,
-            run_date.strftime("%Y%m%d%H"),
-            detected_fmt,
-            len(files),
-        )
+        print("=" * 65)
+        print(f"🚀 METEO2ZARR CONVERSION: {model.upper()} (Run: {run_date.strftime('%Y-%m-%d %H:00 UTC')})")
+        print(f"   Format: {detected_fmt.upper()} | Total Files: {len(files)} | Output: {self.output_dir}")
+        print("=" * 65)
 
-        # Start Dask cluster to serve the live dashboard
-        cluster_mgr = DaskClusterManager(
-            n_workers=self.dask_workers,
-            threads_per_worker=self.dask_threads,
-            dashboard_address=self.dashboard_address,
-        )
-
-        with cluster_mgr as client:
-            try:
-                # 1. Ingest Dataset with dedicated reader
-                ds = self._ingest(files, detected_fmt)
-                if ds is None or len(ds.data_vars) == 0:
-                    logger.error("No variables were ingested from %s", input_path)
-                    return False
-
-                # 2. Apply Transformations (Decumulation & Sliding Windows)
-                logger.info("Applying meteorological transformations & accumulation algorithms...")
-                ds = self._apply_transformations(ds, dt_hours)
-
-                # 3. Partition into Groups
-                logger.info("Partitioning variables into hierarchical Zarr groups...")
-                grouped = self.partitioner.partition(ds)
-
-                # 4. Write Grouped Zarr Stores
-                run_str = run_date.strftime("%Y%m%d%H")
-                run_out_dir = self.output_dir / f"{model}_{run_str}"
-                logger.info("Writing Zarr stores into directory: %s", run_out_dir)
-                self.writer.write_all(grouped, run_out_dir)
-
-                logger.info("✅ Conversion completed successfully for %s %s", model, run_date)
-                return True
-            except Exception as e:
-                logger.exception("Conversion failed: %s", e)
+        try:
+            # 1. Ingest Dataset with dedicated reader (Includes live progress bar)
+            ds = self._ingest(files, detected_fmt)
+            if ds is None or len(ds.data_vars) == 0:
+                print("❌ No variables were ingested.")
                 return False
+
+            # 2. Apply Meteorological Transformations (Decumulation & Sliding Windows)
+            print("\n🧮 [3/4] Calculating precipitation decumulations & derived fields...")
+            t_tr = time.perf_counter()
+            ds = self._apply_transformations(ds, dt_hours)
+            print(f"   ✅ Derived meteorology fields computed in {time.perf_counter() - t_tr:.2f}s")
+
+            # 3. Partition into Groups
+            grouped = self.partitioner.partition(ds)
+
+            # 4. Write Grouped Zarr Stores
+            run_str = run_date.strftime("%Y%m%d%H")
+            run_out_dir = self.output_dir / f"{model}_{run_str}"
+            self.writer.write_all(grouped, run_out_dir)
+
+            print("\n" + "=" * 65)
+            print(f"🎉 SUCCESS: All Zarr groups generated in: {run_out_dir}")
+            print("=" * 65 + "\n")
+            return True
+        except Exception as e:
+            logger.exception("Conversion failed: %s", e)
+            print(f"\n❌ Error during conversion: {e}")
+            return False
 
     def _ingest(self, files: List[Path], fmt: str) -> Optional[xr.Dataset]:
         """Ingests raw files based on detected/configured format."""

@@ -88,7 +88,6 @@ class ZarrGroupPartitioner:
                     gds = gds.isel(time=slice(steps, None))
 
             result[gname] = gds
-            logger.info("  Group '%s': %d variables", gname, len(gds.data_vars))
 
         return result
 
@@ -103,11 +102,20 @@ class ZarrWriter:
     def write_all(self, group_datasets: Dict[str, xr.Dataset], run_dir: Path) -> None:
         run_dir.mkdir(parents=True, exist_ok=True)
         t0 = time.perf_counter()
+        total_groups = len(group_datasets)
 
+        print(f"\n💾 [4/4] Writing {total_groups} partitioned Zarr groups to disk...")
+        
+        idx = 0
         for gname, gds in group_datasets.items():
+            idx += 1
+            t_grp = time.perf_counter()
+            print(f"   [{idx}/{total_groups}] Compressing & writing group: '{gname}' ({len(gds.data_vars)} variables)... ", end="", flush=True)
             self._write_group(gname, gds, run_dir)
+            size_mb = sum(f.stat().st_size for f in (run_dir / f"{gname}.zarr").rglob("*") if f.is_file()) / 1e6
+            print(f"Done in {time.perf_counter() - t_grp:.1f}s ({size_mb:.1f} MB)")
 
-        logger.info("Zarr writing completed in %.1fs", time.perf_counter() - t0)
+        print(f"   ✅ All Zarr stores written in {time.perf_counter() - t0:.2f}s!")
 
     def _write_group(self, group_name: str, ds: xr.Dataset, run_dir: Path) -> None:
         output_path = run_dir / f"{group_name}.zarr"
@@ -115,9 +123,9 @@ class ZarrWriter:
         if tmp_path.exists():
             shutil.rmtree(tmp_path)
 
-        ny = ds.dims.get("latitude", 256)
-        nx = ds.dims.get("longitude", 256)
-        nt = ds.dims.get("time", 1)
+        ny = ds.sizes.get("latitude", 256)
+        nx = ds.sizes.get("longitude", 256)
+        nt = ds.sizes.get("time", 1)
 
         ds = ds.chunk({"time": nt, "latitude": min(256, ny), "longitude": min(256, nx)})
 
@@ -135,6 +143,3 @@ class ZarrWriter:
         if output_path.exists():
             shutil.rmtree(output_path)
         tmp_path.rename(output_path)
-
-        size_mb = sum(f.stat().st_size for f in output_path.rglob("*") if f.is_file()) / 1e6
-        logger.info("  Group '%s' saved: %d vars x %d steps -> %.1f MB", group_name, len(ds.data_vars), nt, size_mb)
