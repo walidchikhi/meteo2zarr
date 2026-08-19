@@ -18,7 +18,7 @@ def dummy_zarr_store(tmp_path):
         coords={"time": times, "latitude": lats, "longitude": lons},
         attrs={"model": "test"},
     )
-    ds["t2"].attrs = {"units": "Celsius", "long_name": "2m Temperature", "level_type": "surface"}
+    ds["t2"].attrs = {"units": "Celsius", "long_name": "2m Temperature", "level_type": "surface", "level": 2.0}
 
     store_dir = tmp_path / "model_run"
     store_dir.mkdir()
@@ -27,13 +27,19 @@ def dummy_zarr_store(tmp_path):
     return store_dir
 
 
-def test_open_and_what(dummy_zarr_store):
+def test_open_and_what_creates_info_file(dummy_zarr_store):
     store = open_zarr(dummy_zarr_store)
-    info = store.what(verbose=False)
+    info = store.what(write_info=True, verbose=False)
 
     assert "surface" in info
     assert "t2" in info["surface"]["variables"]
     assert info["surface"]["n_timesteps"] == 3
+
+    info_file = dummy_zarr_store.parent / f"{dummy_zarr_store.name}.info"
+    assert info_file.exists()
+    content = info_file.read_text()
+    assert "METEO2ZARR INSPECTION: model_run" in content
+    assert "2m Temperature" in content
 
 
 def test_listfields_and_readfield(dummy_zarr_store):
@@ -46,9 +52,9 @@ def test_listfields_and_readfield(dummy_zarr_store):
     assert da.attrs["units"] == "Celsius"
 
 
-def test_plot_and_save(dummy_zarr_store, tmp_path):
+def test_plot_and_savefig(dummy_zarr_store, tmp_path):
     store = open_zarr(dummy_zarr_store)
     out_png = tmp_path / "t2m_plot.png"
-    fig, ax = store.plot("t2", timestep=0, savefig=out_png)
+    fig, ax = store.plot("t2", timestep=0, savefig=out_png, use_cartopy=False)
     assert out_png.exists()
     assert out_png.stat().st_size > 0

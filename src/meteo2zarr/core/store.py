@@ -1,5 +1,6 @@
 """Interactive Reader, Inspector, and Plotter for Zarr Meteorological Datasets."""
 
+import io
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -23,12 +24,10 @@ class MeteoZarr:
     def _load(self) -> None:
         """Loads single store or all nested group stores."""
         if (self.path / ".zgroup").exists() or (self.path / ".zattrs").exists() or (self.path / ".zmetadata").exists():
-            # Single Zarr store
             ds = xr.open_zarr(str(self.path), consolidated=True)
             grp_name = self.path.stem
             self.groups[grp_name] = ds
         else:
-            # Multi-group directory (e.g., surface.zarr, alt_pressure.zarr)
             zarr_folders = sorted(list(self.path.glob("*.zarr")))
             if not zarr_folders:
                 raise ValueError(f"No .zarr stores found in {self.path}")
@@ -36,9 +35,19 @@ class MeteoZarr:
                 grp_name = zf.stem
                 self.groups[grp_name] = xr.open_zarr(str(zf), consolidated=True)
 
-    def what(self, verbose: bool = True) -> Dict[str, Any]:
-        """Inspect and print dataset structure, groups, variables, levels, and times."""
+    def what(self, write_info: bool = True, verbose: bool = True) -> Dict[str, Any]:
+        """Inspect dataset structure, groups, variables, levels, and times.
+        
+        Writes summary into `<zarr_name>.info` file alongside the Zarr store.
+        """
         summary = {}
+        info_lines = []
+        
+        sep = "=" * 70
+        info_lines.append(sep)
+        info_lines.append(f"METEO2ZARR INSPECTION: {self.path.name}")
+        info_lines.append(sep)
+
         for gname, ds in self.groups.items():
             times = [str(t) for t in ds.time.values] if "time" in ds.coords else []
             vars_info = {}
@@ -52,28 +61,39 @@ class MeteoZarr:
                     "shape": list(da.shape),
                 }
 
+            t_start = times[0][:19] if times else "None"
+            t_end = times[-1][:19] if times else "None"
+            lat_len = len(ds.latitude) if "latitude" in ds.coords else 0
+            lon_len = len(ds.longitude) if "longitude" in ds.coords else 0
+
             summary[gname] = {
                 "variables": vars_info,
                 "n_timesteps": len(times),
-                "time_range": (times[0], times[-1]) if times else ("None", "None"),
-                "grid": {
-                    "latitudes": len(ds.latitude) if "latitude" in ds.coords else 0,
-                    "longitudes": len(ds.longitude) if "longitude" in ds.coords else 0,
-                },
+                "time_range": (t_start, t_end),
+                "grid": {"latitudes": lat_len, "longitudes": lon_len},
             }
 
+            info_lines.append(f"\nGroup: '{gname}' ({len(vars_info)} variables, {len(times)} timesteps)")
+            info_lines.append(f"  Time range: {t_start} -> {t_end}")
+            info_lines.append(f"  Grid size : {lat_len} x {lon_len}")
+            info_lines.append("  Variables :")
+            for vname, vmeta in vars_info.items():
+                info_lines.append(f"    - {vname:<16} : {vmeta['long_name']} [{vmeta['units']}] (lvl {vmeta['level']})")
+
+        info_lines.append("\n" + sep)
+        report_text = "\n".join(info_lines)
+
+        # 1. Print to terminal if verbose
         if verbose:
-            print("=" * 65)
-            print(f"METEO2ZARR INSPECTION: {self.path.name}")
-            print("=" * 65)
-            for gname, info in summary.items():
-                print(f"\nGroup: '{gname}' ({len(info['variables'])} variables, {info['n_timesteps']} timesteps)")
-                print(f"  Time range: {info['time_range'][0]} -> {info['time_range'][1]}")
-                print(f"  Grid size : {info['grid']['latitudes']} x {info['grid']['longitudes']}")
-                print("  Variables :")
-                for vname, vmeta in info["variables"].items():
-                    print(f"    - {vname:<16} : {vmeta['long_name']} [{vmeta['units']}]")
-            print("=" * 65)
+            print(report_text)
+
+        # 2. Write <store_name>.info file
+        if write_info:
+            info_file_path = self.path.parent / f"{self.path.name}.info"
+            with open(info_file_path, "w", encoding="utf-8") as f:
+                f.write(report_text + "\n")
+            if verbose:
+                print(f"[OK] Info written to: {info_file_path}")
 
         return summary
 
@@ -127,10 +147,15 @@ class MeteoZarr:
         cmap: str = "Spectral_r",
         title: Optional[str] = None,
         savefig: Optional[Union[str, Path]] = None,
+        use_cartopy: bool = True,
         figsize: tuple = (10, 7),
         dpi: int = 200,
     ) -> Any:
-        """Plot a 2D spatial map of a given variable and save to file if requested."""
+        """Plot a 2D spatial map of a variable.
+        
+        Shows interactively with plt.show() if savefig is None,
+        or saves to disk if savefig is provided.
+        """
         import matplotlib.pyplot as plt
 
         da = self.readfield(var_name, timestep=timestep, group=group)
@@ -138,21 +163,38 @@ class MeteoZarr:
         lats = da.coords["latitude"].values
         lons = da.coords["longitude"].values
 
-        fig, ax = plt.subplots(figsize=figsize)
-        mesh = ax.pcolormesh(lons, lats, data, cmap=cmap, shading="auto")
-        
+        has_cartopy = False
+        if use_cartopy:
+            try:
+                import cartopy.crs as ccrs
+                import cartopy.feature as cfeature
+                has_cartopy = True
+            except ImportError:
+                has_cartopy = False
+
+        if has_cartopy:
+            fig, ax = plt.subplots(figsize=figsize, subplot_kw={"projection": ccrs.PlateCarree()})
+            mesh = ax.pcolormesh(lons, lats, data, cmap=cmap, shading="auto", transform=ccrs.PlateCarree())
+            ax.coastlines(resolution="10m", color="black", linewidth=0.8)
+            ax.add_feature(cfeature.BORDERS, linestyle=":", edgecolor="black")
+            gl = ax.gridlines(draw_labels=True, linestyle="--", alpha=0.5)
+            gl.top_labels = False
+            gl.right_labels = False
+        else:
+            fig, ax = plt.subplots(figsize=figsize)
+            mesh = ax.pcolormesh(lons, lats, data, cmap=cmap, shading="auto")
+            ax.set_xlabel("Longitude")
+            ax.set_ylabel("Latitude")
+            ax.grid(True, linestyle="--", alpha=0.5)
+
         unit = da.attrs.get("units", da.attrs.get("unit", ""))
         cbar = plt.colorbar(mesh, ax=ax, orientation="vertical", pad=0.03, aspect=30)
         cbar.set_label(f"{var_name} ({unit})")
 
-        time_str = str(da.time.values)[:16] if "time" in da.coords else ""
+        time_str = str(da.time.values)[:19] if "time" in da.coords else ""
         long_name = da.attrs.get("long_name", var_name)
         plot_title = title or f"{long_name} | Valid: {time_str}"
         ax.set_title(plot_title, fontsize=12, pad=10)
-        ax.set_xlabel("Longitude")
-        ax.set_ylabel("Latitude")
-        ax.grid(True, linestyle="--", alpha=0.5)
-
         plt.tight_layout()
 
         if savefig:
@@ -160,6 +202,9 @@ class MeteoZarr:
             out_file.parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(str(out_file), dpi=dpi, bbox_inches="tight")
             print(f"[OK] Figure saved to: {out_file}")
+            plt.close(fig)
+        else:
+            plt.show()
 
         return fig, ax
 
