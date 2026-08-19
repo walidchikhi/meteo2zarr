@@ -221,19 +221,44 @@ class MeteoZarr:
     ) -> str:
         """Construct standard default plot filename: zarrStore_subgroups_parameters_date_timestep.png"""
         store_base = self.path.stem.replace(".zarr", "")
-        
         subgroup_part = f"_{group}" if (group and group != store_base) else ""
         
         time_dim = "time" if "time" in da.coords else ("valid_time" if "valid_time" in da.coords else None)
         date_str = "static"
         if time_dim:
             val = str(da[time_dim].values)
-            clean_dt = re.sub(r"[^0-9]", "", val)[:10]  # e.g. 2026081900
+            clean_dt = re.sub(r"[^0-9]", "", val)[:10]
             if clean_dt:
                 date_str = clean_dt
 
         step_str = f"t{timestep:02d}"
         return f"{store_base}{subgroup_part}_{var_name}_{date_str}_{step_str}.{ext}"
+
+    def generate_default_title(
+        self,
+        var_name: str,
+        group: str,
+        da: xr.DataArray,
+        timestep: int = 0,
+    ) -> str:
+        """Construct standard default plot title: Store: <store> | Group: <group> | Parameter: <param> | Date: <date> | Validity: <val>"""
+        store_base = self.path.name
+        long_name = da.attrs.get("long_name", var_name)
+        unit = da.attrs.get("units", da.attrs.get("unit", da.attrs.get("GRIB_units", "")))
+        param_desc = f"{long_name} ({var_name})" if long_name != var_name else var_name
+        if unit:
+            param_desc += f" [{unit}]"
+
+        time_dim = "time" if "time" in da.coords else ("valid_time" if "valid_time" in da.coords else None)
+        val_time = str(da[time_dim].values)[:19] if time_dim else "Static"
+
+        title_parts = [f"Store: {store_base}"]
+        if group and group != self.path.stem:
+            title_parts.append(f"Group: {group}")
+        title_parts.append(f"Param: {param_desc}")
+        title_parts.append(f"Validity: {val_time} (+{timestep}h)")
+
+        return " | ".join(title_parts)
 
     def plot(
         self,
@@ -253,7 +278,7 @@ class MeteoZarr:
         title: Optional[str] = None,
         savefig: Optional[Union[bool, str, Path]] = None,
         use_cartopy: bool = True,
-        figsize: tuple = (10, 7),
+        figsize: tuple = (11, 8),
         dpi: int = 150,
     ) -> Any:
         """Fast and rich cartographic plotter."""
@@ -392,16 +417,14 @@ class MeteoZarr:
             else:  # barbs
                 ax.barbs(sub_lons, sub_lats, sub_u, sub_v, length=5.5, color="black", **vec_kw)
 
-        # Title
-        time_dim = "time" if "time" in da_main.coords else ("valid_time" if "valid_time" in da_main.coords else None)
-        time_str = str(da_main[time_dim].values)[:19] if time_dim else ""
-        def_title = f"{field or f'Wind ({wu}/{wv})'}" + (f" | Valid: {time_str}" if time_str else "")
-        ax.set_title(title or def_title, fontsize=12, pad=10)
+        # Title: Use custom title if provided, otherwise standard structured title
+        final_title = title if title is not None else self.generate_default_title(param_tag, resolved_group, da_main, timestep=timestep)
+        ax.set_title(final_title, fontsize=11, pad=10)
         plt.tight_layout()
 
-        # Handle savefig filename resolution
+        # Handle savefig (custom filename vs default automatic naming)
         if savefig:
-            if savefig is True:  # Default automatic naming requested
+            if savefig is True:
                 out_name = self.generate_default_filename(param_tag, resolved_group, da_main, timestep=timestep)
                 out_file = Path(os.getcwd()) / out_name
             else:
