@@ -2,7 +2,9 @@
 
 import json
 import logging
+import os
 import re
+import sys
 import time
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -103,7 +105,6 @@ class FAReader(BaseNWPReader):
         except ImportError:
             raise RuntimeError("epygram is required for FA format reading. Install via conda or pip.")
 
-        # Ignore epygram numpy mask casting runtime warnings
         warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy.ma.core")
 
         try:
@@ -116,7 +117,6 @@ class FAReader(BaseNWPReader):
             sample = res.readfield(field_list[0])
             validity_dt = sample.validity.get()
 
-            # Cache grid geometry once per file instead of recomputing on every field
             lons, lats = sample.geometry.get_lonlat_grid()
             lat_1d = lats[:, 0] if not np.all(lats[:, 0] == lats[0, 0]) else lats[0, :]
             lon_1d = lons[0, :] if not np.all(lons[0, :] == lons[0, 0]) else lons[:, 0]
@@ -166,12 +166,17 @@ class FAReader(BaseNWPReader):
         """Read all FA files in parallel via ProcessPoolExecutor and concatenate on time."""
         results: Dict[Path, xr.Dataset] = {}
         t0 = time.perf_counter()
+        total_files = len(files)
+        workers_count = min(total_files, n_threads)
 
-        logger.info("Reading %d FA files using %d parallel worker processes...", len(files), min(len(files), n_threads))
-        with ProcessPoolExecutor(max_workers=min(len(files), n_threads)) as pool:
+        logger.info("Reading %d FA files using %d parallel worker processes...", total_files, workers_count)
+        
+        completed_count = 0
+        with ProcessPoolExecutor(max_workers=workers_count) as pool:
             future_to_path = {pool.submit(_read_fa_process_job, fp, self.cfg): fp for fp in files}
             for future in as_completed(future_to_path):
                 fp = future_to_path[future]
+                completed_count += 1
                 try:
                     ds = future.result()
                     if ds is not None:
@@ -179,12 +184,15 @@ class FAReader(BaseNWPReader):
                 except Exception as e:
                     logger.warning("Worker failure on %s: %s", fp.name, e)
 
-        logger.info("Parallel FA reading completed in %.2fs", time.perf_counter() - t0)
+                if completed_count % 10 == 0 or completed_count == total_files:
+                    logger.info("  Progress: %d/%d files read (%.1fs elapsed)", completed_count, total_files, time.perf_counter() - t0)
+
+        logger.info("Parallel FA reading finished in %.2fs", time.perf_counter() - t0)
         if not results:
             return None
 
         datasets = [results[fp] for fp in sorted(results.keys())]
-        logger.info("Merging %d time slices into lazy dataset...", len(datasets))
+        logger.info("Merging %d time slices into unified dataset...", len(datasets))
 
         merged = xr.concat(datasets, dim="time", data_vars="all", compat="override", coords="minimal")
         merged = merged.sortby("time")
