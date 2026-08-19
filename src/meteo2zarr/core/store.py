@@ -3,6 +3,7 @@
 import builtins
 import io
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
@@ -36,68 +37,82 @@ class MeteoZarr:
                 grp_name = zf.stem
                 self.groups[grp_name] = xr.open_zarr(str(zf), consolidated=True)
 
-    def what(self, write_info: bool = False, verbose: bool = True) -> Dict[str, Any]:
+    def what(
+        self,
+        details: Optional[str] = None,
+        sortfields: bool = False,
+        stdout: bool = False,
+        output_dir: Optional[Union[str, Path]] = None,
+        verbose: bool = False,
+    ) -> str:
         """Inspect dataset structure, groups, variables, levels, and times.
         
-        By default prints information without creating any file.
-        Set write_info=True to save output into <store_name>.info.
+        Like `epy_what`:
+        - By default, writes `<zarr_name>.info` in current working directory (where command is run).
+        - If `stdout=True` (-o / --stdout), prints to stdout rather than writing a file.
         """
-        summary = {}
         info_lines = []
-        
-        sep = "=" * 70
+        sep = "========================================================================"
         info_lines.append(sep)
         info_lines.append(f"METEO2ZARR INSPECTION: {self.path.name}")
         info_lines.append(sep)
 
         for gname, ds in self.groups.items():
             times = [str(t) for t in ds.time.values] if "time" in ds.coords else []
-            vars_info = {}
-            for v in ds.data_vars:
-                da = ds[v]
-                vars_info[v] = {
-                    "long_name": da.attrs.get("long_name", v),
-                    "units": da.attrs.get("units", da.attrs.get("unit", "unknown")),
-                    "level_type": da.attrs.get("level_type", "surface"),
-                    "level": da.attrs.get("level", 0.0),
-                    "shape": list(da.shape),
-                }
+            var_names = list(ds.data_vars.keys())
+            if sortfields:
+                var_names = sorted(var_names)
 
             t_start = times[0][:19] if times else "None"
             t_end = times[-1][:19] if times else "None"
             lat_len = len(ds.latitude) if "latitude" in ds.coords else 0
             lon_len = len(ds.longitude) if "longitude" in ds.coords else 0
 
-            summary[gname] = {
-                "variables": vars_info,
-                "n_timesteps": len(times),
-                "time_range": (t_start, t_end),
-                "grid": {"latitudes": lat_len, "longitudes": lon_len},
-            }
+            info_lines.append(f"\nGroup: '{gname}' ({len(var_names)} variables, {len(times)} timesteps)")
+            info_lines.append(f"  Time range  : {t_start} -> {t_end}")
+            info_lines.append(f"  Grid size   : {lat_len} latitudes x {lon_len} longitudes")
+            
+            if details == "grid":
+                if "latitude" in ds.coords and "longitude" in ds.coords:
+                    lats = ds.latitude.values
+                    lons = ds.longitude.values
+                    info_lines.append(f"  Lat bounds  : [{lats[0]:.4f} .. {lats[-1]:.4f}] (step ~ {abs(lats[1]-lats[0]):.4f})")
+                    info_lines.append(f"  Lon bounds  : [{lons[0]:.4f} .. {lons[-1]:.4f}] (step ~ {abs(lons[1]-lons[0]):.4f})")
 
-            info_lines.append(f"\nGroup: '{gname}' ({len(vars_info)} variables, {len(times)} timesteps)")
-            info_lines.append(f"  Time range: {t_start} -> {t_end}")
-            info_lines.append(f"  Grid size : {lat_len} x {lon_len}")
-            info_lines.append("  Variables :")
-            for vname, vmeta in vars_info.items():
-                info_lines.append(f"    - {vname:<16} : {vmeta['long_name']} [{vmeta['units']}] (lvl {vmeta['level']})")
+            info_lines.append("  Variables   :")
+            for vname in var_names:
+                da = ds[vname]
+                long_name = da.attrs.get("long_name", vname)
+                unit = da.attrs.get("units", da.attrs.get("unit", "unknown"))
+                ltype = da.attrs.get("level_type", "surface")
+                lval = da.attrs.get("level_value", da.attrs.get("level", 0.0))
+                
+                line = f"    - {vname:<16} : {long_name} [{unit}] (type: {ltype}"
+                if lval:
+                    line += f", level: {lval}"
+                line += ")"
+                
+                if details == "chunks":
+                    line += f" | chunks: {da.encoding.get('chunks', list(da.shape))}"
+                elif details == "compression":
+                    line += f" | compressor: {da.encoding.get('compressor', 'default')}"
+
+                info_lines.append(line)
 
         info_lines.append("\n" + sep)
         report_text = "\n".join(info_lines)
 
-        # 1. Print to terminal
-        if verbose:
+        if stdout:
             print(report_text)
-
-        # 2. Write <store_name>.info file only if explicitly requested
-        if write_info:
-            info_file_path = self.path.parent / f"{self.path.name}.info"
+        else:
+            # Default: Write to current working directory where command is run
+            cwd = Path(output_dir) if output_dir else Path(os.getcwd())
+            info_file_path = cwd / f"{self.path.name}.info"
             with builtins.open(info_file_path, "w", encoding="utf-8") as f:
                 f.write(report_text + "\n")
-            if verbose:
-                print(f"[OK] Info written to: {info_file_path}")
+            print(f"[OK] Info written to: {info_file_path}")
 
-        return summary
+        return report_text
 
     def listfields(self, group: Optional[str] = None) -> List[str]:
         """Return list of all variable names available."""

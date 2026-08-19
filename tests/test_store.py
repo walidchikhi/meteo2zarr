@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from pathlib import Path
-from meteo2zarr import open_zarr, MeteoZarr
+import meteo2zarr as m2z
 
 
 @pytest.fixture
@@ -27,23 +27,27 @@ def dummy_zarr_store(tmp_path):
     return store_dir
 
 
-def test_open_and_what_creates_info_file(dummy_zarr_store):
-    store = open_zarr(dummy_zarr_store)
-    info = store.what(write_info=True, verbose=False)
+def test_open_and_what_default_file_generation(dummy_zarr_store, tmp_path):
+    store = m2z.open(dummy_zarr_store)
+    # Default: writes <store_name>.info in current working directory
+    store.what(output_dir=tmp_path)
 
-    assert "surface" in info
-    assert "t2" in info["surface"]["variables"]
-    assert info["surface"]["n_timesteps"] == 3
-
-    info_file = dummy_zarr_store.parent / f"{dummy_zarr_store.name}.info"
+    info_file = tmp_path / f"{dummy_zarr_store.name}.info"
     assert info_file.exists()
     content = info_file.read_text()
     assert "METEO2ZARR INSPECTION: model_run" in content
     assert "2m Temperature" in content
 
 
+def test_what_stdout_mode(dummy_zarr_store, capsys):
+    store = m2z.open(dummy_zarr_store)
+    out = store.what(stdout=True)
+    captured = capsys.readouterr()
+    assert "METEO2ZARR INSPECTION" in captured.out
+
+
 def test_listfields_and_readfield(dummy_zarr_store):
-    store = open_zarr(dummy_zarr_store)
+    store = m2z.open(dummy_zarr_store)
     fields = store.listfields()
     assert "t2" in fields
 
@@ -53,7 +57,7 @@ def test_listfields_and_readfield(dummy_zarr_store):
 
 
 def test_plot_and_savefig(dummy_zarr_store, tmp_path):
-    store = open_zarr(dummy_zarr_store)
+    store = m2z.open(dummy_zarr_store)
     out_png = tmp_path / "t2m_plot.png"
     fig, ax = store.plot("t2", timestep=0, savefig=out_png, use_cartopy=False)
     assert out_png.exists()

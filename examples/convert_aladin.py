@@ -15,7 +15,7 @@ def main():
     model_name = "aladin"
     run_date   = datetime(2026, 8, 19, 0, 0)   # 2026081900
     
-    print(f"=== Starting NWP to Zarr Conversion ===")
+    print(f"=== Starting NWP to Zarr Conversion")
     print(f"Input Directory : {input_dir}")
     print(f"Output Directory: {output_dir}")
     print(f"Model           : {model_name}")

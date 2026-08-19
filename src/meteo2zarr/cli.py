@@ -41,10 +41,13 @@ def main() -> None:
     conv_parser.add_argument("--dashboard-address", default="0.0.0.0:8787", help="Dask dashboard address (e.g. 0.0.0.0:8787)")
     conv_parser.add_argument("--pyramids", action="store_true", help="Generate multiscale pyramids (ndpyramid)")
 
-    # 2. What (inspect) subcommand
-    what_parser = subparsers.add_parser("what", help="Inspect contents of a Zarr dataset")
-    what_parser.add_argument("store", help="Path to .zarr file or multi-group Zarr directory")
-    what_parser.add_argument("--save-info", action="store_true", help="Save the output into a <store_name>.info file")
+    # 2. What (inspect) subcommand matching epy_what semantics
+    what_parser = subparsers.add_parser("what", help="Ask what's inside a Zarr resource (similar to epy_what)")
+    what_parser.add_argument("store", help="Name of the Zarr folder or file to be processed.")
+    what_parser.add_argument("-d", "--details", default=None, help="Get some details about each field. E.g. 'grid', 'chunks', or 'compression'.")
+    what_parser.add_argument("-s", "--sortfields", action="store_true", help="Sort fields with regards to their name.")
+    what_parser.add_argument("-o", "--stdout", action="store_true", help="Redirects output to standard output (rather than file).")
+    what_parser.add_argument("-v", "--verbose", action="store_true", help="Run verbosely.")
 
     # 3. Plot subcommand
     plot_parser = subparsers.add_parser("plot", help="Plot a 2D variable from a Zarr store")
@@ -87,7 +90,12 @@ def main() -> None:
 
     elif args.command == "what":
         store = open_store(args.store)
-        store.what(write_info=args.save_info, verbose=True)
+        store.what(
+            details=args.details,
+            sortfields=args.sortfields,
+            stdout=args.stdout,
+            verbose=args.verbose,
+        )
 
     elif args.command == "plot":
         store = open_store(args.store)
