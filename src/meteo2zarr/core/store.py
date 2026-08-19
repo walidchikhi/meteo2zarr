@@ -356,11 +356,21 @@ class MeteoZarr:
                 if abs(lon_max - lon_min) < 350:
                     ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
-            ax.coastlines(resolution="50m", color="black", linewidth=0.8)
-            ax.add_feature(cfeature.BORDERS.with_scale("50m"), linestyle=":", edgecolor="black")
-            gl = ax.gridlines(draw_labels=True, linestyle="--", alpha=0.5)
-            gl.top_labels = False
-            gl.right_labels = False
+            try:
+                ax.coastlines(resolution="50m", color="black", linewidth=0.8)
+                ax.add_feature(cfeature.BORDERS.with_scale("50m"), linestyle=":", edgecolor="black")
+            except Exception:
+                try:
+                    ax.coastlines(resolution="110m", color="black", linewidth=0.8)
+                except Exception:
+                    pass
+
+            try:
+                gl = ax.gridlines(draw_labels=True, linestyle="--", alpha=0.5)
+                gl.top_labels = False
+                gl.right_labels = False
+            except Exception:
+                pass
             transform = ccrs.PlateCarree()
         else:
             fig, ax = plt.subplots(figsize=figsize)
