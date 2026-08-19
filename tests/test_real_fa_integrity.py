@@ -122,7 +122,6 @@ def test_aladin_real_fa_conversion_and_math_zero_diff(tmp_path):
     assert diff_gec_6h == 0.0, f"Non-zero diff in ALADIN Large Scale 6h: {diff_gec_6h}"
 
 
-@pytest.mark.skipif(not HAS_EPYGRAM, reason="epygram not available in runtime environment")
 def test_cli_convert_what_plot_commands(tmp_path):
     """Test CLI commands (convert, what, plot) via subprocess invocation."""
     print("\n>>> [1/3] Testing CLI 'meteo2zarr convert'...")
