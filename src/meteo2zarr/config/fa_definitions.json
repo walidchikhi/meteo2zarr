@@ -1,0 +1,589 @@
+{
+    "cycle": "43",
+    "description": "Definition table for FA/LFA fields mapping to Zarr/NetCDF standard variables",
+    "skip_fields": [
+        "INTSURFGEOPOTENT",
+        "SOMMFLU.RAY.SOLA",
+        "SOMMFLU.RAY.THER",
+        "SURFRAYT.SOLA.DE",
+        "SURFRAYT.THER.DE",
+        "SURFRAYT.SOL.CL",
+        "SURFRAYT.THER.CL",
+        "SURFRAYT.DIR.SUR",
+        "SURFTEMPERATURE",
+        "SURFRESERV.NEIGE",
+        "SURFTENS.TURB.ZO",
+        "SURFTENS.TURB.ME",
+        "SURFFLU.RAY.SOLA",
+        "SURFFLU.RAY.THER",
+        "SURFFLU.LAT.MEVA",
+        "SURFFLU.LAT.MSUB",
+        "SURFFLU.MEVAP.EA",
+        "SURFFLU.MSUBL.NE",
+        "SURFFLU.CHA.SENS",
+        "CLPMHAUT.MOD.XFU",
+        "CLOUD_WATE",
+        "CLOUD_FRAC",
+        "ICE_CRYSTA",
+        "SIM_REFLEC",
+        "SIM_REFLECTI",
+        "POT_VORTIC",
+        "THETA_VIRT",
+        "ABS_VORTIC",
+        "SURFIND.TERREMER",
+        "SURFEVAPOTRANSPI"
+    ],
+    "levels": {
+        "P": {
+            "type": "isobaric",
+            "unit": "hPa",
+            "factor": 0.01,
+            "description": "Pressure levels in hPa"
+        },
+        "S": {
+            "type": "model_level",
+            "unit": "level_index",
+            "factor": 1,
+            "description": "Hybrid model sigma levels"
+        },
+        "H": {
+            "type": "height",
+            "unit": "m",
+            "factor": 1,
+            "description": "Height above ground in meters"
+        },
+        "V": {
+            "type": "pv",
+            "unit": "PVU",
+            "factor": 0.01,
+            "description": "Potential Vorticity levels"
+        },
+        "CLS": {
+            "type": "surface",
+            "unit": "2m",
+            "special": "surface_diagnostics",
+            "description": "2m or 10m Constant Level Surface (Surface boundary layer)"
+        },
+        "SURF": {
+            "type": "surface",
+            "unit": "surface",
+            "description": "Pure surface fields"
+        }
+    },
+    "fields": {
+        "TEMPERATURE": {
+            "shortname": "t",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "Temperature"
+        },
+        "TEMPERATUR": {
+            "shortname": "t",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "Temperature"
+        },
+        "TEMPE_POTE": {
+            "shortname": "theta",
+            "unit": "K",
+            "formula": "None",
+            "desc": "Potential Temperature"
+        },
+        "THETA_PRIM": {
+            "shortname": "theta_p",
+            "unit": "K",
+            "formula": "None",
+            "desc": "Pseudo-adiabatic potential temperature"
+        },
+        "CLSMAXI.TEMPERAT": {
+            "shortname": "tmax",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "Temperature"
+        },
+        "CLSMINI.TEMPERAT": {
+            "shortname": "tmin",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "Temperature"
+        },
+        "HUMI.SPECIFI": {
+            "shortname": "q",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Specific Humidity"
+        },
+        "HUMI.SPECIFIQ": {
+            "shortname": "q",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Specific Humidity"
+        },
+        "HUMI_RELAT": {
+            "shortname": "r",
+            "unit": "%",
+            "formula": "percent",
+            "desc": "Relative Humidity"
+        },
+        "HUMI_RELATIV": {
+            "shortname": "r",
+            "unit": "%",
+            "formula": "percent",
+            "desc": "Relative Humidity"
+        },
+        "GEOPOTENTI": {
+            "shortname": "gh",
+            "unit": "m",
+            "formula": "div98",
+            "desc": "Geopotential Height"
+        },
+        "GEOPOTENTIEL": {
+            "shortname": "gh",
+            "unit": "m",
+            "formula": "div98",
+            "desc": "Geopotential Height"
+        },
+        "VENT_ZONAL": {
+            "shortname": "u",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "U-component of wind"
+        },
+        "VENT_MERID": {
+            "shortname": "v",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "V-component of wind"
+        },
+        "VENT_MERIDIE": {
+            "shortname": "v",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "V-component of wind"
+        },
+        "CLSVENT.ZONAL": {
+            "shortname": "u10",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "10m U-component of wind"
+        },
+        "CLSVENT.MERIDIE": {
+            "shortname": "v10",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "10m V-component of wind"
+        },
+        "CLSVENT.MERIDIEN": {
+            "shortname": "v10",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "10m V-component of wind"
+        },
+        "CLSU.RAF.MOD.XFU": {
+            "shortname": "gust_u",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "U-component of wind gust"
+        },
+        "CLSV.RAF.MOD.XFU": {
+            "shortname": "gust_v",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "V-component of wind gust"
+        },
+        "WIND.U.PHYS": {
+            "shortname": "u",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "U-component of wind (Physical)"
+        },
+        "WIND.V.PHYS": {
+            "shortname": "v",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "V-component of wind (Physical)"
+        },
+        "CLOUD_WATER": {
+            "shortname": "clw",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Cloud water content"
+        },
+        "ICE_CRYSTAL": {
+            "shortname": "cli",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Cloud ice content"
+        },
+        "SNOW": {
+            "shortname": "asnow",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Snow water equivalent content"
+        },
+        "RAIN": {
+            "shortname": "arain",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Rain water content"
+        },
+        "GRAUPEL": {
+            "shortname": "agrau",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "Graupel content"
+        },
+        "TKE": {
+            "shortname": "tke",
+            "unit": "m2 s-2",
+            "formula": "None",
+            "desc": "Turbulent Kinetic Energy"
+        },
+        "TEMPE_POTENT": {
+            "shortname": "theta",
+            "unit": "K",
+            "formula": "None",
+            "desc": "Potential Temperature"
+        },
+        "THETA_VIRTUA": {
+            "shortname": "theta_v",
+            "unit": "K",
+            "formula": "None",
+            "desc": "Virtual Potential Temperature"
+        },
+        "VERT.VELOC": {
+            "shortname": "w",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "Vertical Velocity"
+        },
+        "VERT.VELOCIT": {
+            "shortname": "w",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "Vertical Velocity"
+        },
+        "VITESSE_VERT": {
+            "shortname": "w",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "Vertical Velocity"
+        },
+        "VITESSE_VE": {
+            "shortname": "w",
+            "unit": "m s-1",
+            "formula": "None",
+            "desc": "Vertical Velocity"
+        },
+        "ABS_VORTICIT": {
+            "shortname": "vo",
+            "unit": "s-1",
+            "formula": "None",
+            "desc": "Absolute Vorticity"
+        },
+        "DIVERGENCE": {
+            "shortname": "d",
+            "unit": "s-1",
+            "formula": "None",
+            "desc": "Divergence"
+        },
+        "SIM_REFLECTI": {
+            "shortname": "dbz",
+            "unit": "dBZ",
+            "formula": "None",
+            "desc": "Simulated Reflectivity"
+        },
+        "PRESSURE": {
+            "shortname": "p",
+            "unit": "Pa",
+            "formula": "None",
+            "desc": "Pressure"
+        },
+        "SURFTEMPERATURE": {
+            "shortname": "ts",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "Surface Temperature (Skin)"
+        },
+        "CLSTEMPERATURE": {
+            "shortname": "t2",
+            "unit": "Celsius",
+            "formula": "k2c",
+            "desc": "2m Temperature"
+        },
+        "CLSHUMI.RELATIVE": {
+            "shortname": "r2",
+            "unit": "%",
+            "formula": "percent",
+            "desc": "2m Relative Humidity"
+        },
+        "CLSHUMI.SPECIFIQ": {
+            "shortname": "q2",
+            "unit": "kg kg-1",
+            "formula": "None",
+            "desc": "2m Specific Humidity"
+        },
+        "SURFCAPE.POS.F00": {
+            "shortname": "cape",
+            "unit": "J kg-1",
+            "formula": "None",
+            "desc": "Convective Available Potential Energy"
+        },
+        "MSLPRESSURE": {
+            "shortname": "prmsl",
+            "unit": "Pa",
+            "formula": "None",
+            "desc": "Mean Sea Level Pressure"
+        },
+        "SURFPRESSION": {
+            "shortname": "ps",
+            "unit": "Pa",
+            "formula": "None",
+            "desc": "Surface pressure"
+        },
+        "SURFNEBUL.HAUTE": {
+            "shortname": "hcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "High Cloud Cover"
+        },
+        "SURFNEBUL.MOYENN": {
+            "shortname": "mcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "Medium Cloud Cover"
+        },
+        "SURFNEBUL.BASSE": {
+            "shortname": "lcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "Low Cloud Cover"
+        },
+        "SURFNEBUL.TOTALE": {
+            "shortname": "totcc",
+            "unit": "0-1",
+            "formula": "None",
+            "desc": "Total Cloud Cover"
+        },
+        "SURFISOTPW0.MALT": {
+            "shortname": "iso_zero",
+            "unit": "m",
+            "formula": "div98",
+            "desc": "0C Isotherm Height"
+        },
+        "SURFDIAGHAIL": {
+            "shortname": "hail",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Hail Accumulation"
+        },
+        "SURFACCPLUIE": {
+            "shortname": "tp",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Total Precipitation Accumulation"
+        },
+        "SURFACCNEIGE": {
+            "shortname": "tsnowp",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Total Snowfall Accumulation"
+        },
+        "SURFPREC.EAU.CON": {
+            "shortname": "twatp_con",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Convective Precip"
+        },
+        "SURFPREC.EAU.GEC": {
+            "shortname": "twatp_gec",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Large Scale Precip"
+        },
+        "SURFPREC.NEI.CON": {
+            "shortname": "tsnowp_con",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Convective Precip"
+        },
+        "SURFPREC.NEI.GEC": {
+            "shortname": "tsnowp_gec",
+            "unit": "kg m-2",
+            "formula": "acc",
+            "desc": "Large Scale Precip"
+        },
+        "AOD_DST": {
+            "shortname": "aod_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
+        },
+        "ZN_DST": {
+            "shortname": "zn_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
+        },
+        "FLX_DST": {
+            "shortname": "flx_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
+        },
+        "ZM_DST": {
+            "shortname": "zm_dst",
+            "unit": "",
+            "formula": "None",
+            "desc": "Aerosol Optical Depth (Dust)"
+        }
+    },
+    "derived_fields": {
+        "ws": {
+            "shortname": "ws",
+            "unit": "m s-1",
+            "desc": "Wind Speed",
+            "recipe": {
+                "type": "vector_magnitude",
+                "sources": [
+                    "u",
+                    "v"
+                ]
+            }
+        },
+        "wdir": {
+            "shortname": "wdir",
+            "unit": "degrees",
+            "desc": "Wind Direction",
+            "recipe": {
+                "type": "vector_direction",
+                "sources": [
+                    "u",
+                    "v"
+                ]
+            }
+        },
+        "ws10": {
+            "shortname": "ws10",
+            "unit": "m s-1",
+            "desc": "10m Wind Speed",
+            "recipe": {
+                "type": "vector_magnitude",
+                "sources": [
+                    "u10",
+                    "v10"
+                ]
+            }
+        },
+        "wdir10": {
+            "shortname": "wdir10",
+            "unit": "degrees",
+            "desc": "10m Wind Direction",
+            "recipe": {
+                "type": "vector_direction",
+                "sources": [
+                    "u10",
+                    "v10"
+                ]
+            }
+        },
+        "gust_spd": {
+            "shortname": "gust",
+            "unit": "m s-1",
+            "desc": "Wind Gust Speed",
+            "recipe": {
+                "type": "vector_magnitude",
+                "sources": [
+                    "gust_u",
+                    "gust_v"
+                ]
+            }
+        },
+        "gust_dir": {
+            "shortname": "gust_dir",
+            "unit": "degrees",
+            "desc": "Wind Gust Direction",
+            "recipe": {
+                "type": "vector_direction",
+                "sources": [
+                    "gust_u",
+                    "gust_v"
+                ]
+            }
+        },
+        "rain_aladin": {
+            "shortname": "tp_aladin",
+            "unit": "kg m-2",
+            "desc": "Rain Accumulation",
+            "recipe": {
+                "type": "accumulation",
+                "sources": [
+                    "twatp_con",
+                    "twatp_gec"
+                ]
+            }
+        },
+        "tsnowp_aladin": {
+            "shortname": "tsnowp_aladin",
+            "unit": "kg m-2",
+            "desc": "Snow Accumulation",
+            "recipe": {
+                "type": "accumulation",
+                "sources": [
+                    "tsnowp_con",
+                    "tsnowp_gec"
+                ]
+            }
+        }
+    },
+    "accumulations": {
+        "twatp_con": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "twatp_gec": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tp": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tp_aladin": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp_con": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp_gec": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ],
+        "tsnowp_aladin": [
+            "RR3h",
+            "RR6h",
+            "RR12h",
+            "RR24h"
+        ]
+    }
+}

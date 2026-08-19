@@ -1,0 +1,107 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "meteo2zarr"
+version = "0.1.0"
+description = "High-performance NWP (FA, GRIB, NetCDF) to Cloud-Native Zarr converter"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Walid Chikhi", email = "waliidchikhi@gmail.com" }
+]
+keywords = [
+    "meteorology",
+    "weather",
+    "nwp",
+    "zarr",
+    "xarray",
+    "dask",
+    "arome",
+    "aladin",
+    "grib",
+    "cloud-native",
+    "geospatial"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: GIS",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "xarray>=2023.6.0",
+    "zarr>=2.14.0",
+    "dask[complete]>=2023.6.0",
+    "distributed>=2023.6.0",
+    "numcodecs>=0.11.0",
+    "netCDF4>=1.6.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+fa = [
+    "epygram",
+]
+grib = [
+    "cfgrib>=0.9.10",
+    "eccodes>=1.6.0",
+]
+geo = [
+    "rioxarray>=0.14.0",
+    "ndpyramid>=0.2.0",
+]
+all = [
+    "meteo2zarr[fa,grib,geo]",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.20.0",
+]
+
+[project.scripts]
+meteo2zarr = "meteo2zarr.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/walidchikhi/meteo2zarr"
+Documentation = "https://walidchikhi.github.io/meteo2zarr"
+Repository = "https://github.com/walidchikhi/meteo2zarr.git"
+Issues = "https://github.com/walidchikhi/meteo2zarr/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meteo2zarr"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/meteo2zarr" = "meteo2zarr"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/docs",
+    "/examples",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
