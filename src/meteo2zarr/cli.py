@@ -49,14 +49,25 @@ def main() -> None:
     what_parser.add_argument("-o", "--stdout", action="store_true", help="Redirects output to standard output (rather than file).")
     what_parser.add_argument("-v", "--verbose", action="store_true", help="Run verbosely.")
 
-    # 3. Plot subcommand
-    plot_parser = subparsers.add_parser("plot", help="Plot a 2D variable from a Zarr store")
-    plot_parser.add_argument("store", help="Path to .zarr file or multi-group Zarr directory")
-    plot_parser.add_argument("--var", required=True, help="Variable name to plot (e.g. 2t, tp, ws10)")
-    plot_parser.add_argument("--timestep", type=int, default=0, help="Timestep index (default: 0)")
-    plot_parser.add_argument("--group", default=None, help="Specific Zarr group (optional)")
-    plot_parser.add_argument("--cmap", default="Spectral_r", help="Matplotlib colormap")
-    plot_parser.add_argument("--savefig", default=None, help="Path to save output plot image (PNG/PDF)")
+    # 3. Plot subcommand inspired by epy_cartoplot
+    plot_parser = subparsers.add_parser("plot", help="Simple and advanced plots of meteorological fields from Zarr (similar to epy_cartoplot)")
+    plot_parser.add_argument("store", help="Name of the Zarr store directory to be processed.")
+    plot_parser.add_argument("-f", "-F", "--field", default=None, help="Field identifier of the field to be plotted (e.g. '2t', 'tp_3h', 't850').")
+    plot_parser.add_argument("--wU", "--Ucomponentofwind", dest="wu", default=None, help="U-component of wind to plot vector wind.")
+    plot_parser.add_argument("--wV", "--Vcomponentofwind", dest="wv", default=None, help="V-component of wind to plot vector wind.")
+    plot_parser.add_argument("--timestep", type=int, default=0, help="Timestep index (default: 0).")
+    plot_parser.add_argument("--group", default=None, help="Specific Zarr group (optional).")
+    plot_parser.add_argument("--pm", "--plot_method", dest="plot_method", default="pcolormesh", choices=["pcolormesh", "contourf", "contour"], help="Plot method.")
+    plot_parser.add_argument("-c", "--colormap", default="Spectral_r", help="Matplotlib colormap to use.")
+    plot_parser.add_argument("-m", "--minmax", default=None, help="Min and max values for the plot. Syntax: 'min,max'.")
+    plot_parser.add_argument("-n", "--levelsnumber", type=int, default=50, help="Number of levels for contourf/contour.")
+    plot_parser.add_argument("-t", "--center_cmap_on_0", action="store_true", help="Center the colormap on value 0.")
+    plot_parser.add_argument("--zoom", default=None, help="Zoom region. Syntax: 'lonmin=-5, lonmax=10, latmin=30, latmax=45'.")
+    plot_parser.add_argument("--vpm", "--vector_plot_method", dest="vpm", default="barbs", choices=["barbs", "quiver", "streamplot"], help="Symbol for vectors.")
+    plot_parser.add_argument("-s", "--vectors_subsampling", type=int, default=15, help="Subsampling factor for plotting wind barbs/quivers.")
+    plot_parser.add_argument("--title", default=None, help="Custom title for the plot.")
+    plot_parser.add_argument("-O", "--outputfilename", dest="savefig", default=None, help="Store output in the specified filename (e.g. plot.png).")
+    plot_parser.add_argument("--fd", "--figures_dpi", type=int, default=200, help="Resolution (DPI) of saved figure.")
 
     args = parser.parse_args()
 
@@ -100,11 +111,22 @@ def main() -> None:
     elif args.command == "plot":
         store = open_store(args.store)
         store.plot(
-            var_name=args.var,
+            field=args.field,
+            wu=args.wu,
+            wv=args.wv,
             timestep=args.timestep,
             group=args.group,
-            cmap=args.cmap,
+            plot_method=args.plot_method,
+            colormap=args.colormap,
+            minmax=args.minmax,
+            levelsnumber=args.levelsnumber,
+            center_cmap_on_0=args.center_cmap_on_0,
+            zoom=args.zoom,
+            vector_plot_method=args.vpm,
+            vectors_subsampling=args.vectors_subsampling,
+            title=args.title,
             savefig=args.savefig,
+            dpi=args.figures_dpi,
         )
 
 

@@ -4,8 +4,9 @@ import builtins
 import io
 import logging
 import os
+import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
 
@@ -105,7 +106,6 @@ class MeteoZarr:
         if stdout:
             print(report_text)
         else:
-            # Default: Write to current working directory where command is run
             cwd = Path(output_dir) if output_dir else Path(os.getcwd())
             info_file_path = cwd / f"{self.path.name}.info"
             with builtins.open(info_file_path, "w", encoding="utf-8") as f:
@@ -158,27 +158,67 @@ class MeteoZarr:
 
     def plot(
         self,
-        var_name: str,
+        field: Optional[str] = None,
+        wu: Optional[str] = None,
+        wv: Optional[str] = None,
         timestep: int = 0,
         group: Optional[str] = None,
-        cmap: str = "Spectral_r",
+        plot_method: str = "pcolormesh",
+        colormap: str = "Spectral_r",
+        minmax: Optional[Union[Tuple[float, float], str]] = None,
+        levelsnumber: int = 50,
+        center_cmap_on_0: bool = False,
+        zoom: Optional[str] = None,
+        vector_plot_method: str = "barbs",
+        vectors_subsampling: int = 15,
         title: Optional[str] = None,
         savefig: Optional[Union[str, Path]] = None,
         use_cartopy: bool = True,
         figsize: tuple = (10, 7),
         dpi: int = 200,
     ) -> Any:
-        """Plot a 2D spatial map of a variable.
-        
-        Shows interactively with plt.show() if savefig is None,
-        or saves to disk if savefig is provided.
-        """
+        """Rich cartographic and meteorological plotter inspired by epy_cartoplot."""
         import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
 
-        da = self.readfield(var_name, timestep=timestep, group=group)
-        data = da.values
-        lats = da.coords["latitude"].values
-        lons = da.coords["longitude"].values
+        # Determine if scalar or vector wind plot
+        is_wind_vector = (wu is not None and wv is not None)
+        if not field and not is_wind_vector:
+            raise ValueError("Either `field` or both `wu` and `wv` must be provided.")
+
+        da_scalar = None
+        da_u = None
+        da_v = None
+
+        if is_wind_vector:
+            da_u = self.readfield(wu, timestep=timestep, group=group)
+            da_v = self.readfield(wv, timestep=timestep, group=group)
+            lats = da_u.coords["latitude"].values
+            lons = da_u.coords["longitude"].values
+            da_main = da_u
+        else:
+            da_scalar = self.readfield(field, timestep=timestep, group=group)
+            lats = da_scalar.coords["latitude"].values
+            lons = da_scalar.coords["longitude"].values
+            da_main = da_scalar
+
+        # Parse zoom if provided ('lonmin=-5, lonmax=1.2, latmin=40.8, latmax=51')
+        zoom_extent = None
+        if zoom:
+            m = re.findall(r"([a-zA-Z_]+)\s*=\s*([-+]?\d*\.?\d+)", zoom)
+            z_dict = {k.lower(): float(v) for k, v in m}
+            if all(k in z_dict for k in ("lonmin", "lonmax", "latmin", "latmax")):
+                zoom_extent = [z_dict["lonmin"], z_dict["lonmax"], z_dict["latmin"], z_dict["latmax"]]
+
+        # Parse minmax
+        vmin, vmax = None, None
+        if minmax:
+            if isinstance(minmax, str):
+                parts = [p.strip() for p in minmax.split(",")]
+                vmin = float(parts[0]) if parts[0] != "None" else None
+                vmax = float(parts[1]) if parts[1] != "None" else None
+            elif isinstance(minmax, (list, tuple)):
+                vmin, vmax = minmax[0], minmax[1]
 
         has_cartopy = False
         if use_cartopy:
@@ -191,27 +231,86 @@ class MeteoZarr:
 
         if has_cartopy:
             fig, ax = plt.subplots(figsize=figsize, subplot_kw={"projection": ccrs.PlateCarree()})
-            mesh = ax.pcolormesh(lons, lats, data, cmap=cmap, shading="auto", transform=ccrs.PlateCarree())
+            if zoom_extent:
+                ax.set_extent(zoom_extent, crs=ccrs.PlateCarree())
+
             ax.coastlines(resolution="10m", color="black", linewidth=0.8)
             ax.add_feature(cfeature.BORDERS, linestyle=":", edgecolor="black")
             gl = ax.gridlines(draw_labels=True, linestyle="--", alpha=0.5)
             gl.top_labels = False
             gl.right_labels = False
+            transform = ccrs.PlateCarree()
         else:
             fig, ax = plt.subplots(figsize=figsize)
-            mesh = ax.pcolormesh(lons, lats, data, cmap=cmap, shading="auto")
+            if zoom_extent:
+                ax.set_xlim(zoom_extent[0], zoom_extent[1])
+                ax.set_ylim(zoom_extent[2], zoom_extent[3])
             ax.set_xlabel("Longitude")
             ax.set_ylabel("Latitude")
             ax.grid(True, linestyle="--", alpha=0.5)
+            transform = None
 
-        unit = da.attrs.get("units", da.attrs.get("unit", ""))
-        cbar = plt.colorbar(mesh, ax=ax, orientation="vertical", pad=0.03, aspect=30)
-        cbar.set_label(f"{var_name} ({unit})")
+        # Norm / centering
+        norm = None
+        if center_cmap_on_0:
+            if da_scalar is not None:
+                max_abs = np.nanmax(np.abs(da_scalar.values))
+                norm = mcolors.TwoSlopeNorm(vmin=-max_abs, vcenter=0.0, vmax=max_abs)
 
-        time_str = str(da.time.values)[:19] if "time" in da.coords else ""
-        long_name = da.attrs.get("long_name", var_name)
-        plot_title = title or f"{long_name} | Valid: {time_str}"
-        ax.set_title(plot_title, fontsize=12, pad=10)
+        # 1. Scalar Plot
+        if da_scalar is not None:
+            data = da_scalar.values
+            kw = {"cmap": colormap, "vmin": vmin, "vmax": vmax}
+            if norm:
+                kw["norm"] = norm
+            if transform:
+                kw["transform"] = transform
+
+            if plot_method == "contourf":
+                mesh = ax.contourf(lons, lats, data, levels=levelsnumber, **kw)
+            elif plot_method == "contour":
+                mesh = ax.contour(lons, lats, data, levels=levelsnumber, **kw)
+                ax.clabel(mesh, inline=True, fontsize=8)
+            else:  # pcolormesh
+                mesh = ax.pcolormesh(lons, lats, data, shading="auto", **kw)
+
+            unit = da_scalar.attrs.get("units", da_scalar.attrs.get("unit", ""))
+            cbar = plt.colorbar(mesh, ax=ax, orientation="vertical", pad=0.03, aspect=30)
+            cbar.set_label(f"{field} ({unit})")
+
+        # 2. Wind Vector Plot
+        if is_wind_vector:
+            u_val = da_u.values
+            v_val = da_v.values
+            speed = np.sqrt(u_val**2 + v_val**2)
+
+            step = max(1, vectors_subsampling)
+            sub_lons = lons[::step] if lons.ndim == 1 else lons[::step, ::step]
+            sub_lats = lats[::step] if lats.ndim == 1 else lats[::step, ::step]
+            sub_u = u_val[::step, ::step] if u_val.ndim == 2 else u_val
+            sub_v = v_val[::step, ::step] if v_val.ndim == 2 else v_val
+
+            if not field:
+                # Plot background speed
+                kw_bg = {"cmap": colormap, "shading": "auto"}
+                if transform:
+                    kw_bg["transform"] = transform
+                mesh = ax.pcolormesh(lons, lats, speed, **kw_bg)
+                cbar = plt.colorbar(mesh, ax=ax, orientation="vertical", pad=0.03, aspect=30)
+                cbar.set_label("Wind Speed (m/s)")
+
+            vec_kw = {"transform": transform} if transform else {}
+            if vector_plot_method == "quiver":
+                ax.quiver(sub_lons, sub_lats, sub_u, sub_v, color="black", **vec_kw)
+            elif vector_plot_method == "streamplot":
+                ax.streamplot(lons, lats, u_val, v_val, color="black", density=1.5, **vec_kw)
+            else:  # barbs
+                ax.barbs(sub_lons, sub_lats, sub_u, sub_v, length=5.5, color="black", **vec_kw)
+
+        # Title
+        time_str = str(da_main.time.values)[:19] if "time" in da_main.coords else ""
+        def_title = f"{field or f'Wind ({wu}/{wv})'} | Valid: {time_str}"
+        ax.set_title(title or def_title, fontsize=12, pad=10)
         plt.tight_layout()
 
         if savefig:
