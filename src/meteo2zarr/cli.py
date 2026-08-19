@@ -66,8 +66,8 @@ def main() -> None:
     plot_parser.add_argument("--vpm", "--vector_plot_method", dest="vpm", default="barbs", choices=["barbs", "quiver", "streamplot"], help="Symbol for vectors.")
     plot_parser.add_argument("-s", "--vectors_subsampling", type=int, default=15, help="Subsampling factor for plotting wind barbs/quivers.")
     plot_parser.add_argument("--title", default=None, help="Custom title for the plot.")
-    plot_parser.add_argument("-O", "--outputfilename", dest="savefig", default=None, help="Store output in the specified filename (e.g. plot.png).")
-    plot_parser.add_argument("--fd", "--figures_dpi", type=int, default=200, help="Resolution (DPI) of saved figure.")
+    plot_parser.add_argument("-O", "--outputfilename", dest="savefig", default=None, nargs="?", const=True, help="Save to specified filename or use standard default filename (zarrStore_subgroups_parameters_date_timestep.png) if flag is passed alone.")
+    plot_parser.add_argument("--fd", "--figures_dpi", dest="fd", type=int, default=150, help="Resolution (DPI) of saved figure.")
 
     args = parser.parse_args()
 

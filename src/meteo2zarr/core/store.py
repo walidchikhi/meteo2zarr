@@ -93,12 +93,7 @@ class MeteoZarr:
         output_dir: Optional[Union[str, Path]] = None,
         verbose: bool = False,
     ) -> str:
-        """Inspect dataset structure, groups, variables, levels, and times.
-        
-        Like `epy_what`:
-        - By default, writes `<zarr_name>.info` in current working directory (where command is run).
-        - If `stdout=True` (-o / --stdout), prints to stdout rather than writing a file.
-        """
+        """Inspect dataset structure, groups, variables, levels, and times."""
         info_lines = []
         sep = "========================================================================"
         info_lines.append(sep)
@@ -181,13 +176,14 @@ class MeteoZarr:
         timestep: Optional[Union[int, str]] = None,
         group: Optional[str] = None,
     ) -> xr.DataArray:
-        """Extract a single meteorological DataArray by name and optional timestep."""
+        """Extract a single meteorological DataArray."""
         target_ds = None
+
         if group:
             if group in self.groups and var_name in self.groups[group]:
                 target_ds = self.groups[group]
         else:
-            for gds in self.groups.values():
+            for gname, gds in self.groups.items():
                 if var_name in gds:
                     target_ds = gds
                     break
@@ -206,6 +202,39 @@ class MeteoZarr:
 
         return da
 
+    def _resolve_group_for_field(self, var_name: str, group: Optional[str] = None) -> str:
+        """Find the group name containing a given variable."""
+        if group and group in self.groups:
+            return group
+        for gname, gds in self.groups.items():
+            if var_name in gds:
+                return gname
+        return ""
+
+    def generate_default_filename(
+        self,
+        var_name: str,
+        group: str,
+        da: xr.DataArray,
+        timestep: int = 0,
+        ext: str = "png",
+    ) -> str:
+        """Construct standard default plot filename: zarrStore_subgroups_parameters_date_timestep.png"""
+        store_base = self.path.stem.replace(".zarr", "")
+        
+        subgroup_part = f"_{group}" if (group and group != store_base) else ""
+        
+        time_dim = "time" if "time" in da.coords else ("valid_time" if "valid_time" in da.coords else None)
+        date_str = "static"
+        if time_dim:
+            val = str(da[time_dim].values)
+            clean_dt = re.sub(r"[^0-9]", "", val)[:10]  # e.g. 2026081900
+            if clean_dt:
+                date_str = clean_dt
+
+        step_str = f"t{timestep:02d}"
+        return f"{store_base}{subgroup_part}_{var_name}_{date_str}_{step_str}.{ext}"
+
     def plot(
         self,
         field: Optional[str] = None,
@@ -222,7 +251,7 @@ class MeteoZarr:
         vector_plot_method: str = "barbs",
         vectors_subsampling: int = 15,
         title: Optional[str] = None,
-        savefig: Optional[Union[str, Path]] = None,
+        savefig: Optional[Union[bool, str, Path]] = None,
         use_cartopy: bool = True,
         figsize: tuple = (10, 7),
         dpi: int = 150,
@@ -238,24 +267,29 @@ class MeteoZarr:
         da_scalar = None
         da_u = None
         da_v = None
+        resolved_group = group or ""
 
         if is_wind_vector:
             da_u = self.readfield(wu, timestep=timestep, group=group)
             da_v = self.readfield(wv, timestep=timestep, group=group)
+            resolved_group = self._resolve_group_for_field(wu, group)
             lat_k = "latitude" if "latitude" in da_u.coords else "lat"
             lon_k = "longitude" if "longitude" in da_u.coords else "lon"
             lats = da_u.coords[lat_k].values
             lons = da_u.coords[lon_k].values
             da_main = da_u
+            param_tag = f"wind_{wu}_{wv}"
         else:
             da_scalar = self.readfield(field, timestep=timestep, group=group)
+            resolved_group = self._resolve_group_for_field(field, group)
             lat_k = "latitude" if "latitude" in da_scalar.coords else "lat"
             lon_k = "longitude" if "longitude" in da_scalar.coords else "lon"
             lats = da_scalar.coords[lat_k].values
             lons = da_scalar.coords[lon_k].values
             da_main = da_scalar
+            param_tag = field
 
-        # Parse zoom if provided ('lonmin=-5, lonmax=1.2, latmin=40.8, latmax=51')
+        # Parse zoom
         zoom_extent = None
         if zoom:
             m = re.findall(r"([a-zA-Z_]+)\s*=\s*([-+]?\d*\.?\d+)", zoom)
@@ -365,8 +399,17 @@ class MeteoZarr:
         ax.set_title(title or def_title, fontsize=12, pad=10)
         plt.tight_layout()
 
+        # Handle savefig filename resolution
         if savefig:
-            out_file = Path(savefig)
+            if savefig is True:  # Default automatic naming requested
+                out_name = self.generate_default_filename(param_tag, resolved_group, da_main, timestep=timestep)
+                out_file = Path(os.getcwd()) / out_name
+            else:
+                out_file = Path(savefig)
+                if out_file.is_dir():
+                    out_name = self.generate_default_filename(param_tag, resolved_group, da_main, timestep=timestep)
+                    out_file = out_file / out_name
+
             out_file.parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(str(out_file), dpi=dpi, bbox_inches="tight")
             print(f"[OK] Figure saved to: {out_file}")
