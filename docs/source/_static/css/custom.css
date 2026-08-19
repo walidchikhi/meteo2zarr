@@ -1,0 +1,16 @@
+/* Make documentation take the full width of the screen */
+.wy-nav-content {
+    max-width: 100% !important;
+    padding: 1.5rem 3rem !important;
+}
+
+/* Fix table and pre block formatting */
+table.docutils {
+    width: 100% !important;
+    display: table !important;
+}
+
+/* Ensure clean code blocks and text readability */
+.rst-content {
+    max-width: 100% !important;
+}

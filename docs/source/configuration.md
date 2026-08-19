@@ -1,69 +1,74 @@
 # Declarative Configuration System: Multi-Model Unification
 
-## 🎯 The Core Philosophy
+## The Core Philosophy
 
-In operational meteorology and modern **Full-Stack Web GIS applications** (MapLibre GL, Leaflet, OpenLayers, Titiler), frontend and downstream analytics require **strictly homogeneous data contracts**:
-- Identical canonical variable names (**`shortname`**).
+In operational meteorology and modern Full-Stack Web GIS applications (MapLibre GL, Leaflet, OpenLayers, Titiler), frontend and downstream analytics require strictly homogeneous data contracts:
+- Identical canonical variable names (`shortname`).
 - Identical physical units and unified standard coordinates.
 - Predictable multi-dimensional array shapes.
 
 However, raw meteorological models output heterogeneous keys and formats:
-- **AROME / ALADIN (FA format)**: uses internal Arpege/Accord keys like `CLSTEMPERATURE`, `SURFACCPLUIE`, `SURFPREC.EAU.CON`.
-- **GRIB1 / GRIB2 format**: uses WMO numerical codes, edition-dependent keys, or shortnames like `2t`, `tp`, `10u`.
+- AROME / ALADIN (FA format): uses internal Arpege/Accord keys like `CLSTEMPERATURE`, `SURFACCPLUIE`, `SURFPREC.EAU.CON`.
+- GRIB1 / GRIB2 format: uses WMO numerical codes, edition-dependent keys, or shortnames like `2t`, `tp`, `10u`.
 
-**`meteo2zarr` solves this problem at the root through a declarative, 100% data-driven JSON architecture.**  
-You can map new parameters, apply mathematical formulas, create sliding window accumulations, and define custom storage partitions **without writing a single line of Python code**.
+meteo2zarr solves this problem at the root through a declarative, 100% data-driven JSON architecture.  
+You can map new parameters, apply mathematical formulas, create sliding window accumulations, and define custom storage partitions without writing a single line of Python code.
 
 ---
 
-## 🏛️ Architecture: Input Mapping vs Storage Hierarchy
+## Architecture: Input Mapping vs Storage Hierarchy
 
-```mermaid
-graph LR
-    subgraph "1. Raw Model Inputs"
-        FA[FA File: CLSTEMPERATURE]
-        GRB[GRIB File: 2t / param 11]
-    end
+The conversion pipeline is divided into two distinct decoupled stages:
 
-    subgraph "2. Input Normalization Layer"
-        FADef[fa_definitions.json]
-        GRBDef[grib_definitions.json]
-        Formulas[Unit Formulas: k2c, pa2hpa]
-    end
-
-    subgraph "3. Output Storage Layer"
-        ZGroups[zarr_groups.json]
-    end
-
-    subgraph "4. Cloud-Optimized Zarr Store"
-        ZSurface["surface.zarr (2t [°C])"]
-        ZPrecip["surface_3h.zarr (RR3h [kg m-2])"]
-        ZPress["alt_pressure.zarr (t [°C] on P850, P500)"]
-    end
-
-    FA --> FADef
-    GRB --> GRBDef
-    FADef --> Formulas
-    GRBDef --> Formulas
-    Formulas --> ZGroups
-    ZGroups --> ZSurface
-    ZGroups --> ZPrecip
-    ZGroups --> ZPress
+```text
++-----------------------------------------------------------------------------------+
+| 1. INPUT SOURCES (FA, LFA, GRIB1, GRIB2)                                          |
+|    - FA File   : CLSTEMPERATURE, SURFACCPLUIE, SURFPREC.EAU.CON                   |
+|    - GRIB File : 2t (param 11), tp (param 61), 10u (param 33)                     |
++-----------------------------------------------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+| 2. NORMALIZATION & METADATA MAPPING (fa_definitions.json / grib_definitions.json)  |
+|    - Maps raw field keys -> Canonical shortnames (e.g. CLSTEMPERATURE -> 2t)       |
+|    - Applies physical unit transformations (e.g. k2c: Kelvin -> Celsius)          |
+|    - Triggers sliding window decumulations (RR3h, RR6h, RR12h, RR24h)             |
++-----------------------------------------------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+| 3. STORAGE DISPATCHING & GROUP PARTITIONING (zarr_groups.json)                   |
+|    - Matches variables by level type and duration (surface, isobaric, 3h, 6h)    |
+|    - Groups arrays into independent Zarr sub-stores with optimized chunks         |
++-----------------------------------------------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+| 4. FINAL CLOUD-OPTIMIZED ZARR ARCHIVE                                             |
+|    - surface.zarr       : 2t [Celsius], 10u [m s-1], 10v [m s-1], ps [hPa]       |
+|    - surface_3h.zarr    : tp_3h [kg m-2], twatp_con_3h [kg m-2]                  |
+|    - surface_6h.zarr    : tp_6h [kg m-2], twatp_con_6h [kg m-2]                  |
+|    - alt_pressure.zarr  : t [Celsius], gh [gpm], u [m s-1] on isobaric levels     |
++-----------------------------------------------------------------------------------+
 ```
+
+---
+
+## Configuration Files Roles Comparison
 
 | Configuration File | Scope & Role | What it controls |
 | :--- | :--- | :--- |
-| **`fa_definitions.json`** | **FA/LFA Decoding & Normalization** | Recognizes vertical prefixes (`CLS`, `P`, `H`, `V`), ignores unwanted fields (`skip_fields`), maps raw FA fieldnames to canonical `shortname`, assigns physical units and formulas (`k2c`, `pa2hpa`, `div98`). |
-| **`grib_definitions.json`** | **GRIB1/GRIB2 Decoding & Normalization** | Maps GRIB shortnames, `grib1_param` IDs, and `grib2_key` tuples to the exact same canonical `shortname`, units, and formulas as `fa_definitions.json`. |
-| **`zarr_groups.json`** | **Zarr Store Partitioning & Chunking** | Dispatches normalized variables into independent Zarr sub-groups (`surface`, `surface_3h`, `alt_pressure`, `alt_pv`) using level matching and parameter filtering. |
+| `fa_definitions.json` | FA/LFA Decoding & Normalization | Recognizes vertical prefixes (`CLS`, `P`, `H`, `V`), ignores unwanted fields (`skip_fields`), maps raw FA fieldnames to canonical `shortname`, assigns physical units and formulas (`k2c`, `pa2hpa`, `div98`). |
+| `grib_definitions.json` | GRIB1/GRIB2 Decoding & Normalization | Maps GRIB shortnames, `grib1_param` IDs, and `grib2_key` tuples to the exact same canonical `shortname`, units, and formulas as `fa_definitions.json`. |
+| `zarr_groups.json` | Zarr Store Partitioning & Chunking | Dispatches normalized variables into independent Zarr sub-groups (`surface`, `surface_3h`, `alt_pressure`, `alt_pv`) using level matching and parameter filtering. |
 
 ---
 
-## 🔬 Anatomy of a Parameter: Step-by-Step Breakdown
+## Anatomy of a Parameter: 2-meter Temperature (2t)
 
-Let us trace **2-meter Temperature** through the entire pipeline:
+Let us trace 2-meter Temperature through the entire configuration pipeline:
 
-### 1. In `fa_definitions.json` (FA Model Source)
+### 1. In fa_definitions.json (FA Source)
 ```json
 {
   "levels": {
@@ -84,7 +89,7 @@ Let us trace **2-meter Temperature** through the entire pipeline:
 }
 ```
 
-### 2. In `grib_definitions.json` (GRIB Model Source)
+### 2. In grib_definitions.json (GRIB Source)
 ```json
 {
   "fields": {
@@ -100,7 +105,7 @@ Let us trace **2-meter Temperature** through the entire pipeline:
 }
 ```
 
-### 3. In `zarr_groups.json` (Output Destination Group)
+### 3. In zarr_groups.json (Destination Group)
 ```json
 {
   "groups": {
@@ -115,89 +120,93 @@ Let us trace **2-meter Temperature** through the entire pipeline:
 }
 ```
 
-### 🎯 Result in the Final Zarr Store:
-Regardless of whether the input was an FA file or a GRIB file:
-- **Group**: `surface`
-- **Array Name**: `2t`
-- **Attributes**: `{"long_name": "2m Temperature", "units": "Celsius", "level_type": "surface", "level": 2.0}`
-- **Values**: Automatically transformed from Kelvin to Celsius via the exact formula $T_{°C} = T_K - 273.15$.
+### Final Result in Zarr:
+Regardless of input format:
+- Group: `surface`
+- Array Name: `2t`
+- Attributes: `{"long_name": "2m Temperature", "units": "Celsius", "level_type": "surface", "level": 2.0}`
+- Values: Converted from Kelvin to Celsius via $T_{°C} = T_K - 273.15$.
 
 ---
 
-## ⏱️ Sliding Window Accumulations: How Precipitation Decumulations Work
+## Understanding RR3h, RR6h and Accumulations: Where and How are they Declared?
 
-In NWP models, rainfall is accumulated since the start of the model run:
-$$\text{Total Rain}(T) = \int_0^T P(t) \, dt$$
+A common question is: **Where does `RR3h` come from, what does it contain, and where is it declared?**
 
-Meteorologists and hydrological forecasting applications need sliding window decumulations (e.g., rain in the last 3 hours: $RR_{3h}(T) = \text{Acc}(T) - \text{Acc}(T-3h)$).
+### 1. The Physical Need for Decumulations
+In NWP models (AROME, ALADIN), precipitation fields (`SURFACCPLUIE`, `SURFPREC.EAU.CON`, `tp`) are cumulative quantities integrated since run inception ($t=0$):
+$$\text{Accumulated}(T) = \int_0^T P(t) \, dt$$
 
-### Configuration in `fa_definitions.json` & `grib_definitions.json`:
+Meteorologists need decumulated rainfall over specific sliding intervals, for instance the last 3 hours:
+$$\text{Rain}_{3\text{h}}(T) = \text{Accumulated}(T) - \text{Accumulated}(T - 3\text{h})$$
+
+### 2. Where are the accumulation rules declared?
+In `fa_definitions.json` and `grib_definitions.json` under the `"accumulations"` block:
 ```json
 {
   "accumulations": {
-    "SURFACCPLUIE": ["3h", "6h", "12h", "24h"],
-    "twatp_con": ["3h", "6h", "12h", "24h"],
-    "twatp_gec": ["3h", "6h", "12h", "24h"],
-    "tp": ["3h", "6h", "12h", "24h"]
+    "tp": ["RR3h", "RR6h", "RR12h", "RR24h"],
+    "twatp_con": ["RR3h", "RR6h", "RR12h", "RR24h"],
+    "twatp_gec": ["RR3h", "RR6h", "RR12h", "RR24h"]
   }
 }
 ```
+Here, `"RR3h"`, `"RR6h"`, `"RR12h"`, `"RR24h"` are **accumulation interval triggers** specifying that for each declared base parameter, the processor must generate:
+- `<var>_3h` (e.g. `tp_3h`, `twatp_con_3h`) with metadata attribute `acc_hours = 3`.
+- `<var>_6h` (e.g. `tp_6h`, `twatp_con_6h`) with metadata attribute `acc_hours = 6`.
 
-### Dynamic Dispatch in `zarr_groups.json`:
+### 3. How does zarr_groups.json route them?
+In `zarr_groups.json`, group routing uses the pattern matching rule:
 ```json
 {
-  "groups": {
-    "surface_3h": {
-      "description": "Cumuls 3h (Précipitations)",
-      "match": {
-        "parameters": ["RR3h", "tp_3h", "twatp_con_3h", "twatp_gec_3h"]
-      }
-    },
-    "surface_6h": {
-      "description": "Cumuls 6h (Précipitations)",
-      "match": {
-        "parameters": ["RR6h", "tp_6h", "twatp_con_6h", "twatp_gec_6h"]
-      }
+  "surface_3h": {
+    "description": "Cumuls 3h (Précipitations)",
+    "match": {
+      "parameters": ["RR3h"]
+    }
+  },
+  "surface_6h": {
+    "description": "Cumuls 6h (Précipitations)",
+    "match": {
+      "parameters": ["RR6h"]
     }
   }
 }
 ```
-The accumulation engine (`processing/accumulations.py`) performs high-speed vectorized lazy shifting on Dask chunks, guaranteeing exact zero-difference mathematical precision.
+When `meteo2zarr` generates the 3h decumulated fields, `writer.py` automatically routes any variable generated from the `"RR3h"` rule into `surface_3h.zarr`, while the base instantaneous fields remain in `surface.zarr` (due to `"exclude": ["RR3h", "RR6h", ...]`).
 
 ---
 
-## ⚙️ Unit Formulas and Mathematical Transforms Engine
+## Unit Formulas and Mathematical Transforms Engine
 
 ### Where are the formulas located?
-Formulas are implemented in the high-performance module:  
-👉 **`src/meteo2zarr/processing/derived.py`** (`apply_unit_formula()`).
+The formulas are defined in `src/meteo2zarr/processing/derived.py` within `apply_unit_formula()`.
 
-### Built-in Formulas Reference:
+### Built-in Formulas:
 
-| Formula Key | Mathematical Operation | Typical Meteorological Usage |
+| Formula Key | Operation | Usage |
 | :--- | :--- | :--- |
-| `"k2c"` | $X - 273.15$ | Absolute temperature (Kelvin) to Celsius (°C) |
-| `"pa2hpa"` | $X / 100.0$ | Surface pressure (Pascals) to Hectopascals (hPa) |
-| `"div98"` | $X / 9.80665$ | Geopotential ($m^2 s^{-2}$) to Geopotential Height ($gpm$) |
-| `"percent"` | $X \times 100.0$ | Relative humidity / Cloud cover fraction $[0, 1] \rightarrow [0, 100\%]$ |
-| `"none"` / `"None"` | $X$ (Identity) | Unmodified physical values (Wind $u, v$, $W m^{-2}$, etc.) |
+| `k2c` | $X - 273.15$ | Kelvin to Celsius |
+| `pa2hpa` | $X / 100.0$ | Pascals to Hectopascals |
+| `div98` | $X / 9.80665$ | Geopotential to Geopotential Height ($gpm$) |
+| `percent` | $X \times 100.0$ | Fraction $[0, 1]$ to Percentage $[0, 100\%]$ |
+| `none` / `None` | $X$ | Direct physical values |
 
 ---
 
-## 🛠️ Complete Guide: Adding a New Parameter, Group, or Formula
+## Adding a Custom Parameter and Formula (Step-by-Step)
 
-### Scenario: Adding Surface Solar Radiation (`ssrd`) and a New Custom Formula
-
-#### Step 1: (If needed) Register a new mathematical formula in `processing/derived.py`
+### Step 1: Register a new formula in processing/derived.py (if not existing)
 ```python
-# In src/meteo2zarr/processing/derived.py:
-elif f == "joule2kwh": # Convert Joules to Kilowatt-hours
+# In src/meteo2zarr/processing/derived.py
+elif f == "joule2kwh":
     res = da / 3.6e6
+    res.attrs.update(da.attrs)
     res.attrs["unit"] = "kWh m-2"
     return res
 ```
 
-#### Step 2: Declare the parameter in `fa_definitions.json` and/or `grib_definitions.json`
+### Step 2: Declare parameter in fa_definitions.json and/or grib_definitions.json
 ```json
 "SURFRAYT.SOLA.DE": {
   "shortname": "ssrd",
@@ -207,37 +216,14 @@ elif f == "joule2kwh": # Convert Joules to Kilowatt-hours
 }
 ```
 
-#### Step 3: Add Decumulation Intervals (Optional)
+### Step 3: Add Decumulations (Optional)
 ```json
 "accumulations": {
-  "ssrd": ["3h", "6h", "24h"]
+  "ssrd": ["RR3h", "RR6h", "RR24h"]
 }
 ```
 
-#### Step 4: Route the new field into a Zarr group in `zarr_groups.json`
-To place it in the `surface` group:
-```json
-"surface": {
-  "description": "Paramètres de surface",
-  "match": {
-    "level_types": ["surface", "height"]
-  }
-}
-```
-*Because its level type is `"surface"`, `meteo2zarr` automatically bundles it into `surface.zarr`!*
-
----
-
-## 🚀 Running Conversion with Custom Configuration
-
-You do not need to alter the packaged source files. You can provide an external configuration directory via the CLI `--config` option:
-
+### Step 4: Run Conversion
 ```bash
-# Ingest with customized JSON definitions
-meteo2zarr convert \
-  --model aladin \
-  --run 2026081900 \
-  --input /data/aladin/run_00 \
-  --output /data/zarr_stores \
-  --config /home/chikhi/my_custom_configs/
+meteo2zarr convert --model aladin --run 2026081900 --input /data --output ./zarr_out
 ```
