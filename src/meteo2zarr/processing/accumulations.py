@@ -4,6 +4,7 @@ import logging
 import re
 from typing import Dict, List, Optional
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 logger = logging.getLogger("meteo2zarr.processing.accumulations")
@@ -16,15 +17,19 @@ class AccumulationProcessor:
         self.accum_rules = accum_rules or {}
 
     def compute_sliding_windows(self, ds: xr.Dataset, dt_hours: float = 1.0) -> xr.Dataset:
-        """Compute sliding window accumulations using lazy xarray shifts.
+        """Compute sliding window accumulations using time-aware coordinate matching.
         
         Formula:
-            RR_N(T) = Acc(T) - Acc(T - N)
+            RR_N(T) = Acc(T) - Acc(T - N_hours)
+            
+        This method supports both uniform (e.g., fixed 1h or 3h) and non-uniform
+        forecast timelines (e.g. 1h up to 48h, then 3h beyond 48h).
         """
-        if not self.accum_rules:
+        if not self.accum_rules or "time" not in ds.dims:
             return ds
 
         new_vars: Dict[str, xr.DataArray] = {}
+        time_coord = ds["time"]
 
         for src_var, targets in self.accum_rules.items():
             matching_vars = []
@@ -38,26 +43,29 @@ class AccumulationProcessor:
 
             for v in matching_vars:
                 src = ds[v]
-                n_timesteps = src.sizes.get("time", 0)
 
                 for tgt in targets:
                     m = re.search(r"(\d+)", tgt)
                     if not m:
                         continue
                     hours = int(m.group(1))
-                    steps = max(1, round(hours / dt_hours))
+                    delta = pd.Timedelta(hours=hours)
 
-                    if steps >= n_timesteps:
-                        logger.debug("Skipping %s for %s: %d steps >= %d available", tgt, v, steps, n_timesteps)
-                        continue
+                    # Compute target timestamp: T - N hours
+                    prev_times = time_coord.values - delta
 
-                    tgt_id = f"{v}_{hours}h"
+                    # Check which timestamps have an exact matching predecessor (T - N hours)
+                    # Reindex on exact datetime coordinates
+                    prev_src = src.reindex(time=prev_times, method=None)
+                    
+                    # Align time coordinates for exact difference
+                    prev_src["time"] = time_coord
 
-                    # Decumulation: Diff between current accumulation and shifted lead time
-                    shifted = src.shift(time=steps)
-                    diff = src - shifted
+                    diff = src - prev_src
                     diff = xr.where(diff < 0, 0.0, diff)
 
+                    # Mask out any NaN / non-available initial windows
+                    tgt_id = f"{v}_{hours}h"
                     da_tgt = diff.rename(tgt_id)
                     da_tgt.attrs.update({
                         "units": "kg m-2",
@@ -70,9 +78,8 @@ class AccumulationProcessor:
                     })
 
                     new_vars[tgt_id] = da_tgt
-                    logger.debug("Configured accumulation %s from %s", tgt_id, v)
 
-        if new_vars:
-            ds = ds.assign(new_vars)
+        for name, da in new_vars.items():
+            ds[name] = da
 
         return ds
