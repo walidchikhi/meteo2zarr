@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from meteo2zarr.core.converter import NWPConverter
+from meteo2zarr.core.store import open_zarr
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,11 +20,11 @@ def main() -> None:
     """Entry point for the meteo2zarr CLI."""
     parser = argparse.ArgumentParser(
         prog="meteo2zarr",
-        description="Convert Numerical Weather Prediction (NWP) model outputs to cloud-native Zarr stores.",
+        description="Convert and analyze Numerical Weather Prediction (NWP) Zarr stores.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Convert subcommand
+    # 1. Convert subcommand
     conv_parser = subparsers.add_parser("convert", help="Convert model run to Zarr")
     conv_parser.add_argument("--model", required=True, help="Model name (e.g. arome, aladin, arpege, gfs)")
     conv_parser.add_argument("--run", required=True, help="Run timestamp in YYYYMMDDHH format")
@@ -37,8 +38,21 @@ def main() -> None:
     conv_parser.add_argument("--chunk-time", type=int, default=6, help="Chunk size for time dimension")
     conv_parser.add_argument("--read-threads", type=int, default=16, help="Threads/processes for reading input files")
     conv_parser.add_argument("--write-threads", type=int, default=4, help="Threads for writing Zarr store")
-    conv_parser.add_argument("--dashboard-address", default=":8787", help="Dask dashboard address (e.g. :8787 or 0.0.0.0:3112)")
+    conv_parser.add_argument("--dashboard-address", default="0.0.0.0:8787", help="Dask dashboard address (e.g. 0.0.0.0:8787)")
     conv_parser.add_argument("--pyramids", action="store_true", help="Generate multiscale pyramids (ndpyramid)")
+
+    # 2. What (inspect) subcommand
+    what_parser = subparsers.add_parser("what", help="Inspect contents of a Zarr dataset")
+    what_parser.add_argument("store", help="Path to .zarr file or multi-group Zarr directory")
+
+    # 3. Plot subcommand
+    plot_parser = subparsers.add_parser("plot", help="Plot a 2D variable from a Zarr store")
+    plot_parser.add_argument("store", help="Path to .zarr file or multi-group Zarr directory")
+    plot_parser.add_argument("--var", required=True, help="Variable name to plot (e.g. 2t, tp, ws10)")
+    plot_parser.add_argument("--timestep", type=int, default=0, help="Timestep index (default: 0)")
+    plot_parser.add_argument("--group", default=None, help="Specific Zarr group (optional)")
+    plot_parser.add_argument("--cmap", default="Spectral_r", help="Matplotlib colormap")
+    plot_parser.add_argument("--savefig", default=None, help="Path to save output plot image (PNG/PDF)")
 
     args = parser.parse_args()
 
@@ -69,6 +83,20 @@ def main() -> None:
             dt_hours=args.dt_hours,
         )
         sys.exit(0 if ok else 1)
+
+    elif args.command == "what":
+        store = open_zarr(args.store)
+        store.what()
+
+    elif args.command == "plot":
+        store = open_zarr(args.store)
+        store.plot(
+            var_name=args.var,
+            timestep=args.timestep,
+            group=args.group,
+            cmap=args.cmap,
+            savefig=args.savefig,
+        )
 
 
 if __name__ == "__main__":
