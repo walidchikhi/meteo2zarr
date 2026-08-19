@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "meteo2zarr"
 version = "0.1.0"
-description = "High-performance NWP (FA, GRIB, NetCDF) to Cloud-Native Zarr converter"
+description = "High-performance NWP (FA, GRIB, NetCDF) to Cloud-Native Zarr converter & Zarr stores Manipulation"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Walid Chikhi", email = "waliidchikhi@gmail.com" }
+    { name = "Walid Chikhi", email = "waliidchikhi@gmail.com" , website = "walidchikhi.github.io" },
 ]
 keywords = [
     "meteorology",

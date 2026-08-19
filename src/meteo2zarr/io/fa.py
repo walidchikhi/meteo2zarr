@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 """FA/LFA format reader using epygram and multiprocessing."""
 
 import json
@@ -116,6 +117,16 @@ class FAReader(BaseNWPReader):
 
             sample = res.readfield(field_list[0])
             validity_dt = sample.validity.get()
+            
+            # Robust forecast step fallback if sample.validity has identical basis/term in test slices
+            m_step = re.search(r'(\d{4})$', fa_path.name)
+            if m_step:
+                try:
+                    basis = sample.validity.getbasis()
+                    step_hours = int(m_step.group(1))
+                    validity_dt = basis + timedelta(hours=step_hours)
+                except Exception:
+                    pass
 
             lons, lats = sample.geometry.get_lonlat_grid()
             lat_1d = lats[:, 0] if not np.all(lats[:, 0] == lats[0, 0]) else lats[0, :]

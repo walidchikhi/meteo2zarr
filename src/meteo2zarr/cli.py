@@ -41,7 +41,7 @@ def main() -> None:
     conv_parser.add_argument("--dashboard-address", default="0.0.0.0:8787", help="Dask dashboard address (e.g. 0.0.0.0:8787)")
     conv_parser.add_argument("--pyramids", action="store_true", help="Generate multiscale pyramids (ndpyramid)")
 
-    # 2. What (inspect) subcommand matching epy_what semantics
+    # 2. What (inspect) subcommand 
     what_parser = subparsers.add_parser("what", help="Ask what's inside a Zarr resource (similar to epy_what)")
     what_parser.add_argument("store", help="Name of the Zarr folder or file to be processed.")
     what_parser.add_argument("-d", "--details", default=None, help="Get some details about each field. E.g. 'grid', 'chunks', or 'compression'.")
@@ -49,7 +49,7 @@ def main() -> None:
     what_parser.add_argument("-o", "--stdout", action="store_true", help="Redirects output to standard output (rather than file).")
     what_parser.add_argument("-v", "--verbose", action="store_true", help="Run verbosely.")
 
-    # 3. Plot subcommand inspired by epy_cartoplot
+    # 3. Plot subcommand 
     plot_parser = subparsers.add_parser("plot", help="Simple and advanced plots of meteorological fields from Zarr (similar to epy_cartoplot)")
     plot_parser.add_argument("store", help="Name of the Zarr store directory to be processed.")
     plot_parser.add_argument("-f", "-F", "--field", default=None, help="Field identifier of the field to be plotted (e.g. '2t', 'tp_3h', 't850').")

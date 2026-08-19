@@ -27,7 +27,7 @@ def apply_unit_formula(da: xr.DataArray, formula: str) -> xr.DataArray:
 
     f = formula.lower()
     if f == "k2c":  # Kelvin to Celsius
-        res = da - 273.15
+        res = da - np.float32(273.15) if da.dtype == np.float32 else da - 273.15
         res.attrs.update(da.attrs)
         res.attrs["unit"] = "Celsius"
         return res
