@@ -1,4 +1,4 @@
-"""GRIB1 and GRIB2 format reader using eccodes / cfgrib."""
+"""GRIB1 and GRIB2 format reader using eccodes"""
 
 import logging
 from pathlib import Path
