@@ -8,12 +8,10 @@ build:
     - libeccodes-dev
     - libgeos-dev
     - libproj-dev
+  jobs:
+    post_install:
+      - pip install -r docs/requirements.txt
+      - pip install -e .
 
 sphinx:
   configuration: docs/source/conf.py
-
-python:
-  install:
-    - requirements: docs/requirements.txt
-    - method: pip
-      path: .
