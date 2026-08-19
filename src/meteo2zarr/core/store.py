@@ -9,12 +9,25 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
+import zarr
 
 logger = logging.getLogger("meteo2zarr.store")
 
 
+def _format_time_coords(ds: xr.Dataset) -> List[str]:
+    """Safely extract and format time coordinates from 0D scalar, 1D, or multi-D arrays."""
+    for tk in ("time", "valid_time", "step", "forecast_time"):
+        if tk in ds.coords:
+            val = ds[tk].values
+            if val.ndim == 0:
+                return [str(val)[:19]]
+            else:
+                return [str(t)[:19] for t in val]
+    return []
+
+
 class MeteoZarr:
-    """Convenience class to open, inspect, slice, and plot meteo2zarr stores."""
+    """Convenience class to open, inspect, slice, and plot any meteo2zarr / Zarr store."""
 
     def __init__(self, path: Union[str, Path]) -> None:
         self.path = Path(path)
@@ -25,18 +38,52 @@ class MeteoZarr:
         self._load()
 
     def _load(self) -> None:
-        """Loads single store or all nested group stores."""
+        """Robust loader handling single stores, internal sub-groups, and multi-file stores."""
+        # Case 1: Direct Zarr store (.zgroup / .zattrs / .zmetadata)
         if (self.path / ".zgroup").exists() or (self.path / ".zattrs").exists() or (self.path / ".zmetadata").exists():
-            ds = xr.open_zarr(str(self.path), consolidated=True)
-            grp_name = self.path.stem
-            self.groups[grp_name] = ds
-        else:
+            try:
+                ds = xr.open_zarr(str(self.path), consolidated=True)
+                if len(ds.data_vars) > 0:
+                    self.groups[self.path.stem] = ds
+            except Exception:
+                pass
+
+            # Check for internal nested Zarr groups (e.g. root.keys() -> ['run_2025102300', ...])
+            try:
+                zg = zarr.open(str(self.path), mode="r")
+                if hasattr(zg, "group_keys"):
+                    for subg in zg.group_keys():
+                        try:
+                            ds_sub = xr.open_zarr(str(self.path), group=subg, consolidated=True)
+                            self.groups[subg] = ds_sub
+                        except Exception:
+                            try:
+                                ds_sub = xr.open_zarr(str(self.path), group=subg, consolidated=False)
+                                self.groups[subg] = ds_sub
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+        # Case 2: Multi-folder store directory (e.g. surface.zarr, alt_pressure.zarr)
+        if not self.groups:
             zarr_folders = sorted(list(self.path.glob("*.zarr")))
-            if not zarr_folders:
-                raise ValueError(f"No .zarr stores found in {self.path}")
             for zf in zarr_folders:
-                grp_name = zf.stem
-                self.groups[grp_name] = xr.open_zarr(str(zf), consolidated=True)
+                try:
+                    self.groups[zf.stem] = xr.open_zarr(str(zf), consolidated=True)
+                except Exception:
+                    try:
+                        self.groups[zf.stem] = xr.open_zarr(str(zf), consolidated=False)
+                    except Exception:
+                        pass
+
+        # Case 3: Fallback standard open
+        if not self.groups:
+            try:
+                ds = xr.open_zarr(str(self.path), consolidated=False)
+                self.groups[self.path.stem] = ds
+            except Exception as e:
+                raise ValueError(f"Could not open valid Zarr store at: {self.path} (error: {e})")
 
     def what(
         self,
@@ -59,33 +106,35 @@ class MeteoZarr:
         info_lines.append(sep)
 
         for gname, ds in self.groups.items():
-            times = [str(t) for t in ds.time.values] if "time" in ds.coords else []
+            times = _format_time_coords(ds)
             var_names = list(ds.data_vars.keys())
             if sortfields:
                 var_names = sorted(var_names)
 
-            t_start = times[0][:19] if times else "None"
-            t_end = times[-1][:19] if times else "None"
-            lat_len = len(ds.latitude) if "latitude" in ds.coords else 0
-            lon_len = len(ds.longitude) if "longitude" in ds.coords else 0
+            t_start = times[0] if times else "Static / None"
+            t_end = times[-1] if times else "Static / None"
+            lat_name = "latitude" if "latitude" in ds.coords else ("lat" if "lat" in ds.coords else None)
+            lon_name = "longitude" if "longitude" in ds.coords else ("lon" if "lon" in ds.coords else None)
+            lat_len = len(ds[lat_name]) if lat_name else 0
+            lon_len = len(ds[lon_name]) if lon_name else 0
 
             info_lines.append(f"\nGroup: '{gname}' ({len(var_names)} variables, {len(times)} timesteps)")
             info_lines.append(f"  Time range  : {t_start} -> {t_end}")
             info_lines.append(f"  Grid size   : {lat_len} latitudes x {lon_len} longitudes")
             
-            if details == "grid":
-                if "latitude" in ds.coords and "longitude" in ds.coords:
-                    lats = ds.latitude.values
-                    lons = ds.longitude.values
+            if details == "grid" and lat_name and lon_name:
+                lats = ds[lat_name].values
+                lons = ds[lon_name].values
+                if len(lats) > 1 and len(lons) > 1:
                     info_lines.append(f"  Lat bounds  : [{lats[0]:.4f} .. {lats[-1]:.4f}] (step ~ {abs(lats[1]-lats[0]):.4f})")
                     info_lines.append(f"  Lon bounds  : [{lons[0]:.4f} .. {lons[-1]:.4f}] (step ~ {abs(lons[1]-lons[0]):.4f})")
 
             info_lines.append("  Variables   :")
             for vname in var_names:
                 da = ds[vname]
-                long_name = da.attrs.get("long_name", vname)
-                unit = da.attrs.get("units", da.attrs.get("unit", "unknown"))
-                ltype = da.attrs.get("level_type", "surface")
+                long_name = da.attrs.get("long_name", da.attrs.get("GRIB_name", vname))
+                unit = da.attrs.get("units", da.attrs.get("unit", da.attrs.get("GRIB_units", "unknown")))
+                ltype = da.attrs.get("level_type", da.attrs.get("GRIB_typeOfLevel", "surface"))
                 lval = da.attrs.get("level_value", da.attrs.get("level", 0.0))
                 
                 line = f"    - {vname:<16} : {long_name} [{unit}] (type: {ltype}"
@@ -148,11 +197,12 @@ class MeteoZarr:
 
         da = target_ds[var_name]
 
-        if timestep is not None:
+        time_dim = "time" if "time" in da.dims else ("valid_time" if "valid_time" in da.dims else None)
+        if timestep is not None and time_dim and da.sizes.get(time_dim, 0) > 1:
             if isinstance(timestep, int):
-                da = da.isel(time=timestep)
+                da = da.isel({time_dim: timestep})
             else:
-                da = da.sel(time=timestep)
+                da = da.sel({time_dim: timestep})
 
         return da
 
@@ -192,13 +242,17 @@ class MeteoZarr:
         if is_wind_vector:
             da_u = self.readfield(wu, timestep=timestep, group=group)
             da_v = self.readfield(wv, timestep=timestep, group=group)
-            lats = da_u.coords["latitude"].values
-            lons = da_u.coords["longitude"].values
+            lat_k = "latitude" if "latitude" in da_u.coords else "lat"
+            lon_k = "longitude" if "longitude" in da_u.coords else "lon"
+            lats = da_u.coords[lat_k].values
+            lons = da_u.coords[lon_k].values
             da_main = da_u
         else:
             da_scalar = self.readfield(field, timestep=timestep, group=group)
-            lats = da_scalar.coords["latitude"].values
-            lons = da_scalar.coords["longitude"].values
+            lat_k = "latitude" if "latitude" in da_scalar.coords else "lat"
+            lon_k = "longitude" if "longitude" in da_scalar.coords else "lon"
+            lats = da_scalar.coords[lat_k].values
+            lons = da_scalar.coords[lon_k].values
             da_main = da_scalar
 
         # Parse zoom if provided ('lonmin=-5, lonmax=1.2, latmin=40.8, latmax=51')
@@ -233,7 +287,6 @@ class MeteoZarr:
             if zoom_extent:
                 ax.set_extent(zoom_extent, crs=ccrs.PlateCarree())
 
-            # Use 50m resolution for instant responsiveness (10m requires downloading heavy NaturalEarth shapefiles)
             ax.coastlines(resolution="50m", color="black", linewidth=0.8)
             ax.add_feature(cfeature.BORDERS.with_scale("50m"), linestyle=":", edgecolor="black")
             gl = ax.gridlines(draw_labels=True, linestyle="--", alpha=0.5)
@@ -273,7 +326,7 @@ class MeteoZarr:
             else:  # pcolormesh
                 mesh = ax.pcolormesh(lons, lats, data, shading="auto", **kw)
 
-            unit = da_scalar.attrs.get("units", da_scalar.attrs.get("unit", ""))
+            unit = da_scalar.attrs.get("units", da_scalar.attrs.get("unit", da_scalar.attrs.get("GRIB_units", "")))
             cbar = plt.colorbar(mesh, ax=ax, orientation="vertical", pad=0.03, aspect=30)
             cbar.set_label(f"{field} ({unit})")
 
@@ -306,8 +359,9 @@ class MeteoZarr:
                 ax.barbs(sub_lons, sub_lats, sub_u, sub_v, length=5.5, color="black", **vec_kw)
 
         # Title
-        time_str = str(da_main.time.values)[:19] if "time" in da_main.coords else ""
-        def_title = f"{field or f'Wind ({wu}/{wv})'} | Valid: {time_str}"
+        time_dim = "time" if "time" in da_main.coords else ("valid_time" if "valid_time" in da_main.coords else None)
+        time_str = str(da_main[time_dim].values)[:19] if time_dim else ""
+        def_title = f"{field or f'Wind ({wu}/{wv})'}" + (f" | Valid: {time_str}" if time_str else "")
         ax.set_title(title or def_title, fontsize=12, pad=10)
         plt.tight_layout()
 
