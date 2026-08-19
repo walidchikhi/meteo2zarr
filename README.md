@@ -101,6 +101,9 @@ pytest tests/
 ```
 
 ---
+## Acknowledgments
+
+Special thanks to Mr. KERROUMI from Météo Algérie (ONM) for his valuable support and contributions during the development of the initial version of this code.
 
 ## License
 
