@@ -6,37 +6,55 @@ on:
   workflow_dispatch:
 
 jobs:
-  pypi-publish:
-    name: Build and publish to PyPI
+  build-wheels:
+    name: Build wheels on Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    permissions:
-      # Required for PyPI Trusted Publishing (OIDC)
-      id-token: write
-      contents: read
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install build dependencies
+      - name: Install build tools
         run: |
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Build binary wheel and source distribution
-        run: |
-          python -m build
+      - name: Build distribution
+        run: python -m build
 
-      - name: Check package validity with Twine
-        run: |
-          twine check dist/*
+      - name: Check package validity
+        run: twine check dist/*
 
-      - name: Publish package distributions to PyPI
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.python-version }}
+          path: dist/
+
+  publish-pypi:
+    name: Publish all distributions to PyPI
+    needs: build-wheels
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download all built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          packages-dir: dist/
           skip-existing: true
